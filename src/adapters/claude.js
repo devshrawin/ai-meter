@@ -64,6 +64,8 @@
       const meters = [];
       for (const [k, v] of Object.entries(j)) {
         if (!v || typeof v !== 'object' || typeof v.utilization !== 'number') continue;
+        // Unused buckets come back as 0% with no reset time; hide until they start counting.
+        if (v.utilization === 0 && !v.resets_at && !LABELS[k]) continue;
         meters.push({
           id: k,
           label: LABELS[k] || AM.prettyKey(k),
