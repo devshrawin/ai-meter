@@ -9,6 +9,21 @@
   const resSubs = [];
   const groups = {};
   let injectOk = false;
+  const NOISE = /\/_data\/|cdn-cgi|\/rum\b|analytics|telemetry|statsig|sentry|segment|amplitude|datadog|\/log(s|ging)?\b|\/events?\b|\/t\/?$/i;
+
+  // Debug log records the structure of a request body (key names, model-ish values), never message text.
+  const MODELISH = /model|mode|kind|type|effort|reasoning/i;
+  const bodyShape = (body) => {
+    const j = AM.safeJSON(body);
+    if (!j || typeof j !== 'object' || Array.isArray(j)) return body ? `(${body.length} chars, not JSON)` : '';
+    const parts = Object.keys(j).slice(0, 30).map((k) => {
+      const v = j[k];
+      if (MODELISH.test(k) && (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean')) return `${k}=${String(v).slice(0, 40)}`;
+      if (v && typeof v === 'object' && !Array.isArray(v)) return `${k}{${Object.keys(v).slice(0, 12).join(',')}}`;
+      return k;
+    });
+    return 'keys: ' + parts.join(', ');
+  };
 
   const alive = () => {
     try { return !!chrome.runtime?.id; } catch { return false; }
@@ -69,13 +84,13 @@
     }
     if (d.kind === 'request') {
       reqSubs.forEach((f) => safe(f, d));
-      if (settings.debug && d.method === 'POST' && alive()) {
-        AM.debugLog({ provider: adapter.id, kind: 'request', method: d.method, url: d.url.split('?')[0] }).catch(() => {});
+      if (settings.debug && (d.method === 'POST' || d.method === 'WS') && !NOISE.test(d.url) && alive()) {
+        AM.debugLog({ provider: adapter.id, kind: 'request', method: d.method, url: d.url.split('?')[0], body: bodyShape(d.body) });
       }
     } else if (d.kind === 'response') {
       resSubs.forEach((f) => safe(f, d));
       if (settings.debug && alive()) {
-        AM.debugLog({ provider: adapter.id, kind: 'response', method: d.method, status: d.status, url: d.url.split('?')[0], body: (d.body || '').slice(0, 3000) }).catch(() => {});
+        AM.debugLog({ provider: adapter.id, kind: 'response', method: d.method, status: d.status, url: d.url.split('?')[0], body: (d.body || '').slice(0, 3000) });
       }
     }
   });
@@ -91,13 +106,13 @@
     if (area !== 'local' || !changes.settings) return;
     const wasDebug = settings.debug;
     settings = AM.mergeSettings(changes.settings.newValue);
-    if (settings.debug && !wasDebug) checkHook();
+    if (settings.debug !== wasDebug) checkHook();
     if (adapter.refresh) adapter.refresh();
     publish();
   });
 
   function checkHook() {
-    window.postMessage({ source: 'aimeter-content', kind: 'ping' }, location.origin);
+    window.postMessage({ source: 'aimeter-content', kind: 'ping', debug: !!settings.debug }, location.origin);
     setTimeout(() => {
       if (!injectOk && settings.debug && alive()) {
         AM.debugLog({ provider: adapter.id, kind: 'status', url: location.host, body: 'network hook NOT active — request/response capture unavailable on this page' });

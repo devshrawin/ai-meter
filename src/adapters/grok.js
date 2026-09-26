@@ -16,6 +16,13 @@
       this.est = AM.estimator(ctx, 'grok');
       ctx.onResponse((d) => {
         if (/\/rest\/rate-limits/.test(d.url) && d.status === 200) this.parse(AM.safeJSON(d.body), AM.safeJSON(d.reqBody));
+        else if (/credit|billing/i.test(d.url) && d.status === 200) {
+          const meters = AM.findLimits(AM.safeJSON(d.body), { parentKey: 'Credits' });
+          if (meters.length) {
+            this.real.credits = meters;
+            ctx.report('real', Object.values(this.real).flat());
+          } else ctx.log('credits response had no remaining counters', d.url);
+        }
       });
       ctx.onRequest((d) => {
         if (d.method !== 'POST' || !SEND_RE.test(d.url)) return;
