@@ -8,6 +8,7 @@
   const reqSubs = [];
   const resSubs = [];
   const groups = {};
+  let injectOk = false;
 
   const alive = () => {
     try { return !!chrome.runtime?.id; } catch { return false; }
@@ -25,7 +26,12 @@
     onRequest: (fn) => reqSubs.push(fn),
     onResponse: (fn) => resSubs.push(fn),
     visible: () => document.visibilityState === 'visible',
-    log: (...a) => settings.debug && console.log('[AI Meter]', adapter.id, ...a),
+    log: (...a) => {
+      if (!settings.debug) return;
+      console.log('[AI Meter]', adapter.id, ...a);
+      const text = a.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))).join(' ').slice(0, 3000);
+      if (alive()) AM.debugLog({ provider: adapter.id, kind: 'note', url: location.host, body: text });
+    },
     report(group, meters) {
       groups[group] = meters || [];
       publish();
@@ -56,6 +62,11 @@
   window.addEventListener('message', (e) => {
     if (e.source !== window || !e.data || e.data.source !== 'aimeter-inject') return;
     const d = e.data;
+    if (d.kind === 'pong') {
+      injectOk = true;
+      if (settings.debug && alive()) AM.debugLog({ provider: adapter.id, kind: 'status', url: location.host, body: `network hook active (fetch hooked: ${d.fetchHooked})` });
+      return;
+    }
     if (d.kind === 'request') {
       reqSubs.forEach((f) => safe(f, d));
       if (settings.debug && d.method === 'POST' && alive()) {
@@ -78,10 +89,21 @@
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local' || !changes.settings) return;
+    const wasDebug = settings.debug;
     settings = AM.mergeSettings(changes.settings.newValue);
+    if (settings.debug && !wasDebug) checkHook();
     if (adapter.refresh) adapter.refresh();
     publish();
   });
+
+  function checkHook() {
+    window.postMessage({ source: 'aimeter-content', kind: 'ping' }, location.origin);
+    setTimeout(() => {
+      if (!injectOk && settings.debug && alive()) {
+        AM.debugLog({ provider: adapter.id, kind: 'status', url: location.host, body: 'network hook NOT active — request/response capture unavailable on this page' });
+      }
+    }, 3000);
+  }
 
   AM.loadSettings()
     .catch(() => AM.mergeSettings(null))
@@ -90,5 +112,6 @@
       adapter.init(ctx);
       AM.banner.watch(ctx);
       publish();
+      checkHook();
     });
 })();

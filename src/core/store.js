@@ -33,9 +33,14 @@
     };
   };
 
-  AM.debugLog = async (entry) => {
-    const { 'debug.log': log = [] } = await chrome.storage.local.get('debug.log');
-    log.unshift({ t: Date.now(), ...entry });
-    await chrome.storage.local.set({ 'debug.log': log.slice(0, 60) });
+  // Serialized so bursts of network events don't overwrite each other's read-modify-write.
+  let logChain = Promise.resolve();
+  AM.debugLog = (entry) => {
+    logChain = logChain.then(async () => {
+      const { 'debug.log': log = [] } = await chrome.storage.local.get('debug.log');
+      log.unshift({ t: Date.now(), ...entry });
+      await chrome.storage.local.set({ 'debug.log': log.slice(0, 60) });
+    }).catch(() => {});
+    return logChain;
   };
 })();

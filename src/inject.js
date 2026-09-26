@@ -51,6 +51,12 @@
     return res;
   };
 
+  const ourFetch = window.fetch;
+  window.addEventListener('message', (e) => {
+    if (e.source !== window || !e.data || e.data.source !== 'aimeter-content' || e.data.kind !== 'ping') return;
+    post({ kind: 'pong', fetchHooked: window.fetch === ourFetch });
+  });
+
   const XO = XMLHttpRequest.prototype.open;
   const XS = XMLHttpRequest.prototype.send;
   XMLHttpRequest.prototype.open = function (method, url) {
