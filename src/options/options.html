@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>AI Meter Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <main>
+    <h1>AI Meter settings</h1>
+
+    <section>
+      <h2>General</h2>
+      <label class="check"><input type="checkbox" id="widget"> Show on-page meter</label>
+      <label class="check"><input type="checkbox" id="notify"> Desktop notifications at
+        <input type="text" id="thresholds" size="12"> % (comma separated) and on reset</label>
+    </section>
+
+    <section>
+      <h2>Estimate rules</h2>
+      <p class="hint">ChatGPT and Gemini don't publish usage numbers, so AI Meter counts your sends locally and
+        compares against these limits. Rules are matched top to bottom against the model name; first match wins.
+        Limit 0 means "just count". Set these to match your plan.</p>
+      <div id="quotas"></div>
+    </section>
+
+    <div class="save-row">
+      <button id="save" class="primary">Save</button>
+      <button id="defaults">Restore defaults</button>
+      <span id="status"></span>
+    </div>
+
+    <section>
+      <h2>Debug</h2>
+      <label class="check"><input type="checkbox" id="debug"> Log limit-related network responses (for checking endpoints)</label>
+      <p class="hint">Stores the last 60 matching requests/responses locally. Request bodies (your prompts) are never stored.</p>
+      <div class="save-row">
+        <button id="copyLog">Copy log</button>
+        <button id="clearLog">Clear log</button>
+        <button id="clearData">Reset all usage data</button>
+      </div>
+      <pre id="log"></pre>
+    </section>
+  </main>
+  <script src="../core/quotas.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>
