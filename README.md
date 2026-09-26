@@ -1,6 +1,6 @@
 # AI Meter
 
-A Chrome extension that shows how much of your usage limit is left on **Claude, ChatGPT, Gemini, Grok and Perplexity** — as a small draggable meter on the page, a toolbar badge, and a popup with every provider in one place. Desktop notifications fire at 75 / 90 / 100 % and again when a limit resets.
+A Chrome extension that shows how much of your usage limit is left on **Claude, ChatGPT, Gemini, Grok, Perplexity, Kimi, DeepSeek, Qwen, Le Chat, Copilot, Meta AI, Poe — and any other AI chat site you add** — as a small draggable meter on the page, a toolbar badge, and a popup with every provider in one place. Desktop notifications fire at 75 / 90 / 100 % and again when a limit resets.
 
 ![icon](icons/icon128.png)
 
@@ -21,30 +21,45 @@ Every meter is tagged with where its number came from:
 | `estimate` | Counted locally from your sends, compared against limits you set |
 | `banner` | Picked up from the site's own "limit reached" / "N messages left" notice |
 
-| Provider | Source | How |
-|---|---|---|
-| Claude | `real` | Reads `/api/organizations/{org}/usage` — the same endpoint behind Settings › Usage. Session (5h) and weekly utilization + reset times. Refreshes every minute and after each message. |
-| ChatGPT | `estimate` + `real` | Counts sends per model against editable rules (defaults: 160 msgs / 3h, Thinking 3000 / week). Also picks up `limits_progress` counters (deep research, images…) when the app loads them. |
-| Gemini | `estimate` | Counts prompts, tagged with the model from the mode picker (default: Pro/Thinking 100 / day). |
-| Grok | `real` | Captures `/rest/rate-limits` responses (remaining / total queries per model) and re-queries after each send. |
-| Perplexity | `real` or `estimate` | Uses remaining-query counters from the app's settings / rate-limit calls when present, otherwise counts queries. |
+| Provider | Source | How | Verified live |
+|---|---|---|---|
+| Claude | `real` | `GET /api/organizations/{org}/usage` — the endpoint behind Settings › Usage. Session (5h) + weekly utilization and reset times. | yes |
+| ChatGPT | `estimate` + `real` | Chat caps aren't exposed anywhere, so sends are counted per model (defaults: 160 / 3h, Thinking 3000 / week). Real Codex 5h / weekly windows from `GET /backend-api/wham/usage` (Bearer from `/api/auth/session`, kept in memory only), plus `limits_progress` feature counters. | no |
+| Gemini | `real` | Replays the `jSf9Qc` batchexecute RPC behind gemini.google.com/usage → 5h + weekly usage. Falls back to counting prompts. | no |
+| Grok | `real` | Weekly percentage pool from `GrokBuildBilling/GetGrokCreditsConfig` (gRPC-web protobuf, decoded in-extension). Sends detected on the `/ws/mgw` WebSocket. | endpoints yes, numbers no |
+| Perplexity | `real` | `GET /rest/rate-limit/all` → remaining Pro searches / research / labs. | no |
+| Kimi | `real` | `MembershipService/GetSubscription` → `balances[].amountUsedRatio`. | no |
+| DeepSeek, Qwen, Le Chat, Copilot, Meta AI, Poe | `estimate` | None of these expose usage; sends are counted (Le Chat default 25 / day). | no |
+| Any site you add | `estimate` | Settings → Other AI sites. Sends detected heuristically (chat-like POST or WebSocket text frame). | — |
+
+Every site also gets two free signals: the site's own limit notices (banner watcher) and HTTP 429 responses (with `Retry-After` as the reset time).
 
 Estimate limits change often and differ by plan — set yours in **Settings → Estimate rules**.
+
+## Adding any AI site
+
+Settings → **Other AI sites** → enter the hostname (e.g. `chat.example.com`), optional limit + window → **Add site**. Chrome asks for access to that one site only (`optional_host_permissions`); AI Meter then registers its scripts there with `chrome.scripting.registerContentScripts`. Remove the site to revoke access.
 
 ## Privacy
 
 - Everything stays in `chrome.storage.local` on your machine. No servers, no analytics.
 - A page-world script mirrors network calls to the extension so it can spot sends and usage responses. Adapters only extract the **model name**; prompt text is never stored.
+- Auth/session responses are never forwarded. Tokens needed for a usage call (ChatGPT, Kimi) stay in memory and are sent only back to that provider's own domain.
+- The debug log stores request bodies as key names only, full response bodies only for usage/limit endpoints, and just the JSON *shape* (keys and types) of anything else.
 - Usage requests are made from your own logged-in tab, to the provider's own domain, exactly as the site's settings page would.
 
 ## Debugging endpoints
 
 Providers change internal APIs without notice. If a meter stops updating:
 
-1. Settings → Debug → enable **Log limit-related network responses**.
+1. Settings → Debug → enable logging, then reload the site's tab.
 2. Use the site normally (send a message, open its usage/settings page).
-3. Back in Settings, **Copy log** — it lists POST endpoints and any JSON responses matching `rate-limit|usage|limits|quota`.
-4. Update the matching file in `src/adapters/`.
+3. Back in Settings, **Copy log**. It shows whether the network hook is active, every POST / WebSocket send (body keys only), full usage/limit responses, the shape of other JSON responses, and adapter errors.
+4. Update the matching file in `src/adapters/` (parsers live in `src/core/parsers.js` with tests in `test/`).
+
+## Credits
+
+Endpoint shapes for ChatGPT `wham/usage`, Gemini `jSf9Qc`, Grok credits protobuf and Kimi were learned from the MIT-licensed [RateBucket](https://github.com/Chihiro521/RateBucket-rate-limit-bucket), [claudetuner](https://github.com/chaehyun2/claudetuner) and [CodexBar](https://github.com/steipete/CodexBar). Parsers here are independent JS implementations.
 
 ## Project layout
 
@@ -57,10 +72,11 @@ src/
   core/
     quotas.js          providers, default estimate rules, settings merge
     common.js          pure helpers: limit parsing, rolling counts, reset-time parsing
+    parsers.js         pure provider parsers (ChatGPT, Gemini, Grok protobuf, Kimi)
     store.js           chrome.storage helpers, local send counter
     banner.js          watches for the site's own limit notices
     widget.js          on-page meter (shadow DOM)
-  adapters/            one file per provider
+  adapters/            one file per provider; generic.js = counting sites + user-added sites
   popup/  options/
 scripts/make-icons.mjs   renders icons/ with no dependencies
 test/                    node:test unit tests for core logic

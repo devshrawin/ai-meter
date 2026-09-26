@@ -1,7 +1,11 @@
 const AM = globalThis.AIMeter;
 const $ = (id) => document.getElementById(id);
-const EDITABLE = ['chatgpt', 'gemini', 'grok', 'perplexity'];
 let settings;
+
+const editable = () => [
+  ...AM.PROVIDERS.filter((p) => p.id !== 'claude').map((p) => ({ id: p.id, name: `${p.name} — ${p.source}` })),
+  ...settings.customSites.map((s) => ({ id: 'site:' + s.host, name: `${s.host} — estimate` })),
+];
 
 const el = (tag, attrs = {}, text) => {
   const e = document.createElement(tag);
@@ -34,15 +38,14 @@ function ruleRow(rule) {
 function renderQuotas() {
   const box = $('quotas');
   box.textContent = '';
-  for (const pid of EDITABLE) {
-    const p = AM.PROVIDERS.find((x) => x.id === pid);
-    box.append(el('h3', {}, p.name));
+  for (const { id: pid, name } of editable()) {
+    box.append(el('h3', {}, name));
     const wrap = el('div', { className: 'table' });
     const table = el('table', { dataset: { provider: pid } });
     const head = el('tr');
     ['Label', 'Model pattern (regex)', 'Limit', 'Window (h)', ''].forEach((h) => head.append(el('th', {}, h)));
     table.append(head);
-    (settings.quotas[pid] || []).forEach((r) => table.append(ruleRow(r)));
+    (settings.quotas[pid] || AM.defaultQuotasFor(pid, settings)).forEach((r) => table.append(ruleRow(r)));
     wrap.append(table);
     const add = el('button', {}, '+ Add rule');
     add.addEventListener('click', () => {
@@ -116,8 +119,67 @@ async function save() {
 
 $('save').addEventListener('click', save);
 $('debug').addEventListener('change', save);
+function renderSites() {
+  const ul = $('sites');
+  ul.textContent = '';
+  if (!settings.customSites.length) ul.append(el('li', {}, 'No extra sites yet.'));
+  for (const s of settings.customSites) {
+    const li = el('li');
+    li.append(el('b', {}, s.host), el('span', {}, s.limit ? `${s.limit} per ${s.windowHours}h` : `counting, ${s.windowHours}h window`));
+    const del = el('button', { className: 'x', title: 'Remove site' }, '×');
+    del.addEventListener('click', () => removeSite(s.host));
+    li.append(del);
+    ul.append(li);
+  }
+}
+
+const scriptIds = (host) => ['aimeter-main-' + host, 'aimeter-iso-' + host];
+
+async function addSite() {
+  const host = $('siteHost').value.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/[/?#].*$/, '');
+  if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(host)) return flash('Enter a hostname like chat.example.com');
+  if (AM.providerForHost(host, settings)) return flash(`${host} is already tracked.`);
+  const origins = [`https://${host}/*`];
+  // Must be the first await so Chrome still sees the click as a user gesture.
+  const granted = await chrome.permissions.request({ origins });
+  if (!granted) return flash('Chrome access to that site was not granted.');
+  try {
+    await chrome.scripting.unregisterContentScripts({ ids: scriptIds(host) }).catch(() => {});
+    await chrome.scripting.registerContentScripts(AM.siteScripts(host));
+  } catch (e) {
+    return flash('Could not register: ' + e.message);
+  }
+  settings = {
+    ...settings,
+    customSites: [...settings.customSites, {
+      host,
+      limit: Math.max(0, Number($('siteLimit').value) || 0),
+      windowHours: Math.max(0.1, Number($('siteWindow').value) || 24),
+    }],
+  };
+  await chrome.storage.local.set({ settings });
+  $('siteHost').value = $('siteLimit').value = $('siteWindow').value = '';
+  renderSites();
+  renderQuotas();
+  flash(`Added ${host}. Reload its tab to start tracking.`);
+}
+
+async function removeSite(host) {
+  await chrome.scripting.unregisterContentScripts({ ids: scriptIds(host) }).catch(() => {});
+  await chrome.permissions.remove({ origins: [`https://${host}/*`] }).catch(() => {});
+  const quotas = { ...settings.quotas };
+  delete quotas['site:' + host];
+  settings = { ...settings, quotas, customSites: settings.customSites.filter((s) => s.host !== host) };
+  await chrome.storage.local.set({ settings });
+  await chrome.storage.local.remove(['usage.site:' + host, 'events.site:' + host]);
+  renderSites();
+  renderQuotas();
+  flash(`Removed ${host}.`);
+}
+
+$('addSite').addEventListener('click', addSite);
 $('defaults').addEventListener('click', async () => {
-  settings = AM.mergeSettings(null);
+  settings = { ...AM.mergeSettings(null), customSites: settings.customSites };
   await chrome.storage.local.set({ settings });
   renderGeneral();
   renderQuotas();
@@ -145,6 +207,7 @@ chrome.storage.onChanged.addListener((c, area) => {
   const { settings: s } = await chrome.storage.local.get('settings');
   settings = AM.mergeSettings(s);
   renderGeneral();
+  renderSites();
   renderQuotas();
   renderLog();
 })();

@@ -4,9 +4,13 @@
   window.__aimeterInjected = true;
 
   const TAG = 'aimeter-inject';
-  const WATCH = /rate[-_]?limit|usage|limits|conversation\/init|quota|user\/settings|credit|billing|balance|entitlement/i;
+  // Endpoints whose full response bodies adapters need (usage / limits / billing).
+  const WATCH = /rate[-_]?limit|usage|limits|conversation\/init|quota|credit|billing|balance|entitlement|subscription|rpcids=[^&]*jSf9Qc/i;
   // Analytics/telemetry endpoints that would flood the discovery log.
-  const NOISE = /\/_data\/|cdn-cgi|\/rum\b|analytics|telemetry|statsig|sentry|segment|amplitude|datadog|\/log(s|ging)?\b|\/events?\b|\/t\/?$/i;
+  const NOISE = /\/_data\/|cdn-cgi|\/rum\b|analytics|telemetry|statsig|sentry|segment|amplitude|datadog|event_logging|\/log(s|ging)?\b|\/events?\b|\/t\/?$/i;
+  // Never forward bodies from auth endpoints: they carry identity and tokens.
+  const PRIVATE = /\/auth\/|\/session\b|\/token\b|\/me\b|\/account\b|\/profile\b/i;
+  const BINARY = /grpc|proto|octet-stream/i;
   const MAX_REQ = 20000;
   const MAX_RES = 200000;
   let captureAll = false;
@@ -29,15 +33,52 @@
     if (b instanceof URLSearchParams) return b.toString().slice(0, MAX_REQ);
     return null;
   };
-  const wanted = (url, status, contentType) => {
-    if (status === 429) return true;
-    if (!contentType.includes('json')) return false;
-    if (WATCH.test(url)) return true;
-    return captureAll && sameSite(url) && !NOISE.test(url) && !contentType.includes('event-stream');
+  const toB64 = (buf) => {
+    const bytes = new Uint8Array(buf.slice(0, 65536));
+    let s = '';
+    for (let i = 0; i < bytes.length; i += 8192) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+    return btoa(s);
   };
 
-  const origFetch = window.fetch;
-  window.fetch = async function (input, init) {
+  // 'full' = send body text, 'binary' = send base64 bytes, 'shape' = send only JSON key names, null = skip.
+  const mode = (url, status, ct) => {
+    if (PRIVATE.test(url)) return null;
+    if (status === 429) return 'full';
+    if (WATCH.test(url)) return BINARY.test(ct) ? 'binary' : ct.includes('json') || ct.includes('text') ? 'full' : null;
+    if (captureAll && ct.includes('json') && !ct.includes('event-stream') && sameSite(url) && !NOISE.test(url)) return 'shape';
+    return null;
+  };
+
+  const shape = (text) => {
+    try {
+      const walk = (v, d) => {
+        if (Array.isArray(v)) return v.length ? [walk(v[0], d + 1)] : [];
+        if (v && typeof v === 'object') {
+          if (d > 3) return '{…}';
+          const o = {};
+          for (const k of Object.keys(v).slice(0, 25)) o[k] = walk(v[k], d + 1);
+          return o;
+        }
+        return typeof v;
+      };
+      return JSON.stringify(walk(JSON.parse(text), 0)).slice(0, 3000);
+    } catch { return '(unparsed)'; }
+  };
+
+  const emit = (m, url, method, status, reqBody, res) => {
+    const retryAfter = res.headers ? res.headers.get('retry-after') : null;
+    if (m === 'binary') {
+      res.clone().arrayBuffer()
+        .then((b) => post({ kind: 'response', url, method, status, reqBody, retryAfter, binary: true, body: toB64(b) }))
+        .catch(() => {});
+    } else {
+      res.clone().text()
+        .then((t) => post({ kind: 'response', url, method, status, reqBody, retryAfter, shapeOnly: m === 'shape', body: m === 'shape' ? shape(t) : t.slice(0, MAX_RES) }))
+        .catch(() => {});
+    }
+  };
+
+  const wrap = (base) => async function (input, init) {
     let url = '';
     let method = 'GET';
     let body = null;
@@ -60,18 +101,24 @@
       }
     } catch {}
 
-    const res = await origFetch.apply(this, arguments);
+    const res = await base.apply(this, arguments);
     try {
-      if (wanted(url, res.status, res.headers.get('content-type') || '')) {
-        res.clone().text()
-          .then((t) => post({ kind: 'response', url, method, status: res.status, reqBody: body, body: t.slice(0, MAX_RES) }))
-          .catch(() => {});
-      }
+      const m = mode(url, res.status, res.headers.get('content-type') || '');
+      if (m) emit(m, url, method, res.status, body, res);
     } catch {}
     return res;
   };
 
-  const ourFetch = window.fetch;
+  let ourFetch = wrap(window.fetch);
+  window.fetch = ourFetch;
+  // Some apps replace window.fetch after load; re-wrap whatever they installed.
+  setInterval(() => {
+    if (window.fetch !== ourFetch) {
+      ourFetch = wrap(window.fetch);
+      window.fetch = ourFetch;
+    }
+  }, 2000);
+
   window.addEventListener('message', (e) => {
     if (e.source !== window || !e.data || e.data.source !== 'aimeter-content' || e.data.kind !== 'ping') return;
     captureAll = !!e.data.debug;
@@ -91,11 +138,17 @@
       post({ kind: 'request', ...info, body });
       this.addEventListener('load', () => {
         try {
-          if (!wanted(info.url, this.status, this.getResponseHeader('content-type') || '')) return;
+          const m = mode(info.url, this.status, this.getResponseHeader('content-type') || '');
+          if (!m || m === 'binary') return;
           let t = null;
           if (this.responseType === '' || this.responseType === 'text') t = this.responseText;
           else if (this.responseType === 'json') t = JSON.stringify(this.response);
-          if (t != null) post({ kind: 'response', ...info, status: this.status, reqBody: body, body: t.slice(0, MAX_RES) });
+          if (t == null) return;
+          post({
+            kind: 'response', ...info, status: this.status, reqBody: body,
+            retryAfter: this.getResponseHeader('retry-after'),
+            shapeOnly: m === 'shape', body: m === 'shape' ? shape(t) : t.slice(0, MAX_RES),
+          });
         } catch {}
       });
     }

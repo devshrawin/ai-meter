@@ -17,9 +17,22 @@
     </section>
 
     <section>
+      <h2>Other AI sites</h2>
+      <p class="hint">Add any AI chat site that isn't built in. Chrome asks for access to that one site only. AI Meter then
+        counts your sends there (estimate), and watches for the site's own limit notices and rate-limit errors.</p>
+      <div class="save-row">
+        <input type="text" id="siteHost" placeholder="chat.example.com">
+        <input type="number" id="siteLimit" placeholder="Limit (0 = just count)" min="0">
+        <input type="number" id="siteWindow" placeholder="Window (h)" min="0.1" step="0.5">
+        <button id="addSite">Add site</button>
+      </div>
+      <ul id="sites"></ul>
+    </section>
+
+    <section>
       <h2>Estimate rules</h2>
-      <p class="hint">ChatGPT and Gemini don't publish usage numbers, so AI Meter counts your sends locally and
-        compares against these limits. Rules are matched top to bottom against the model name; first match wins.
+      <p class="hint">Where a site doesn't publish usage numbers, AI Meter counts your sends locally and compares
+        against these limits. Sites with real numbers only use these as a fallback. Rules are matched top to bottom against the model name; first match wins.
         Limit 0 means "just count". Set these to match your plan.</p>
       <div id="quotas"></div>
     </section>

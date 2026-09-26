@@ -18,10 +18,17 @@ const ago = (t) => {
 
 async function render() {
   const all = await chrome.storage.local.get(null);
-  const entries = AM.PROVIDERS.map((p) => all['usage.' + p.id]).filter(Boolean);
+  const order = (id) => {
+    const i = AM.PROVIDERS.findIndex((p) => p.id === id);
+    return i < 0 ? AM.PROVIDERS.length : i;
+  };
+  const entries = Object.keys(all)
+    .filter((k) => k.startsWith('usage.'))
+    .map((k) => all[k])
+    .sort((a, b) => order(a.provider) - order(b.provider) || a.name.localeCompare(b.name));
   list.textContent = '';
   if (!entries.length) {
-    list.append(el('div', 'empty', 'Open Claude, ChatGPT, Gemini, Grok or Perplexity and AI Meter will start tracking.'));
+    list.append(el('div', 'empty', 'Open any supported AI site (Claude, ChatGPT, Gemini, Grok, Perplexity, Kimi, DeepSeek…) and AI Meter will start tracking. Add other sites in Settings.'));
     return;
   }
   const now = Date.now();

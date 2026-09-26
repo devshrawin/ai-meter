@@ -27,6 +27,10 @@ button { font: inherit; font-size: 13px; padding: 5px 12px; border-radius: 8px; 
 button:hover { border-color: var(--accent); }
 button.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
 button.x { padding: 2px 8px; }
+.save-row input { width: auto; flex: 1 1 140px; }
+#sites { list-style: none; padding: 0; margin: 0; }
+#sites li { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); font-size: 13px; }
+#sites li span { color: var(--muted); }
 .save-row { display: flex; gap: 8px; align-items: center; margin: 10px 0 14px; flex-wrap: wrap; }
 #status { color: var(--muted); font-size: 13px; }
 pre { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 11.5px;

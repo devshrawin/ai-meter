@@ -77,10 +77,24 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   });
 });
 
+// Keep dynamic content scripts for user-added sites in step with settings (they can be dropped on update).
+async function syncSites() {
+  const settings = await getSettings();
+  const registered = new Set((await chrome.scripting.getRegisteredContentScripts()).map((s) => s.id));
+  for (const site of settings.customSites) {
+    const origins = [`https://${site.host}/*`];
+    if (!(await chrome.permissions.contains({ origins }))) continue;
+    const missing = AM.siteScripts(site.host).filter((s) => !registered.has(s.id));
+    if (missing.length) await chrome.scripting.registerContentScripts(missing).catch((e) => console.warn('[AI Meter]', e));
+  }
+}
+chrome.runtime.onInstalled.addListener(() => syncSites().catch(() => {}));
+chrome.runtime.onStartup.addListener(() => syncSites().catch(() => {}));
+
 chrome.tabs.onActivated.addListener(async ({ tabId }) => {
   try {
     const tab = await chrome.tabs.get(tabId);
-    const provider = tab.url && AM.providerForHost(new URL(tab.url).hostname);
+    const provider = tab.url && AM.providerForHost(new URL(tab.url).hostname, await getSettings());
     if (!provider) return;
     const key = 'usage.' + provider.id;
     const got = await chrome.storage.local.get(key);

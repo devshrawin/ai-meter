@@ -1,7 +1,10 @@
-// Grok: the app asks /rest/rate-limits per model and gets remaining/total back (real).
+// Grok: since mid-2026 usage is one weekly percentage pool, served as gRPC-web protobuf from
+// GrokBuildBilling/GetGrokCreditsConfig (real). Messages are sent over the /ws/mgw WebSocket.
 (() => {
   const AM = globalThis.AIMeter;
-  const SEND_RE = /\/rest\/app-chat\/conversations\/(new|[^/]+\/responses)(\?|$)/;
+  const CREDITS_PATH = '/grok_api_v2.GrokBuildBilling/GetGrokCreditsConfig';
+  // Empty request message wrapped in a gRPC-web frame, as the app sends it.
+  const CREDITS_BODY = new Uint8Array([0x00, 0x00, 0x00, 0x00, 0x02, 0x08, 0x00]);
 
   AM.register({
     id: 'grok',
@@ -11,61 +14,58 @@
 
     init(ctx) {
       this.ctx = ctx;
-      this.real = {};
-      this.lastModel = null;
       this.est = AM.estimator(ctx, 'grok');
-      ctx.onResponse((d) => {
-        if (/\/rest\/rate-limits/.test(d.url) && d.status === 200) this.parse(AM.safeJSON(d.body), AM.safeJSON(d.reqBody));
-        else if (/credit|billing/i.test(d.url) && d.status === 200) {
-          const meters = AM.findLimits(AM.safeJSON(d.body), { parentKey: 'Credits' });
-          if (meters.length) {
-            this.real.credits = meters;
-            ctx.report('real', Object.values(this.real).flat());
-          } else ctx.log('credits response had no remaining counters', d.url);
-        }
-      });
       ctx.onRequest((d) => {
-        if (d.method !== 'POST' || !SEND_RE.test(d.url)) return;
-        const model = AM.safeJSON(d.body)?.modelName || '';
-        if (model && model !== this.lastModel) {
-          this.lastModel = model;
-          chrome.storage.local.set({ 'grok.model': model }).catch(() => {});
+        let model = null;
+        if (d.method === 'WS' && /\/ws\/mgw/.test(d.url)) {
+          const ev = AM.safeJSON(d.body)?.event;
+          if (!ev || !ev.item) return;
+          model = ev.item.modelName || ev.item.model || '';
+        } else if (d.method === 'POST' && /\/rest\/app-chat\/conversations\/(new|[^/]+\/responses)(\?|$)/.test(d.url)) {
+          model = AM.safeJSON(d.body)?.modelName || '';
+        } else {
+          return;
         }
         this.est.record(model);
         clearTimeout(this.t);
-        this.t = setTimeout(() => this.refresh(), 4000);
+        this.t = setTimeout(() => this.refresh(), 6000);
       });
-      chrome.storage.local.get('grok.model').then((g) => {
-        if (!this.lastModel && g['grok.model']) this.lastModel = g['grok.model'];
-        this.refresh();
-      }).catch(() => this.est.refresh());
-      setInterval(() => ctx.visible() && this.refresh(), 90000);
-    },
-
-    parse(j, req) {
-      if (!j) return;
-      const model = req?.modelName || 'Grok';
-      const kind = req?.requestKind && req.requestKind !== 'DEFAULT' ? ' · ' + req.requestKind.toLowerCase() : '';
-      const meters = AM.findLimits(j, { label: model + kind });
-      if (!meters.length) return this.ctx.log('rate-limits response had no counters', j);
-      this.real[model + kind] = meters;
-      this.ctx.report('real', Object.values(this.real).flat());
+      ctx.onResponse((d) => {
+        if (d.status !== 200) return;
+        if (d.url.includes('GetGrokCreditsConfig') && d.binary) this.parseCredits(AM.b64ToBytes(d.body));
+        else if (/\/rest\/rate-limits/.test(d.url)) {
+          const meters = AM.findLimits(AM.safeJSON(d.body), { label: AM.safeJSON(d.reqBody)?.modelName || 'Grok' });
+          if (meters.length) ctx.report('legacy', meters);
+        }
+      });
+      this.est.refresh();
+      this.refresh();
+      setInterval(() => ctx.visible() && this.refresh(), 120000);
     },
 
     async refresh() {
       this.est.refresh();
-      if (!this.lastModel) return this.ctx.log('no Grok model seen yet — send a message so the model name can be captured');
-      const req = { requestKind: 'DEFAULT', modelName: this.lastModel };
       try {
-        const j = await this.ctx.getJSON('/rest/rate-limits', {
+        const r = await fetch(CREDITS_PATH, {
           method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(req),
+          credentials: 'include',
+          headers: { 'content-type': 'application/grpc-web+proto', 'x-grpc-web': '1', accept: '*/*' },
+          body: CREDITS_BODY,
         });
-        this.parse(j, req);
+        const status = r.headers.get('grpc-status');
+        if (!r.ok || (status && status !== '0')) {
+          throw new Error(`HTTP ${r.status} grpc-status ${status || '-'} ${r.headers.get('grpc-message') || ''}`.trim());
+        }
+        this.parseCredits(new Uint8Array(await r.arrayBuffer()));
       } catch (e) {
-        this.ctx.log('rate-limits fetch failed:', e.message);
+        this.ctx.log('Grok credits fetch failed:', e.message);
       }
+    },
+
+    parseCredits(bytes) {
+      const { meters, error } = AM.parseGrokCredits(bytes);
+      if (meters.length) this.ctx.report('real', meters);
+      else this.ctx.log('Grok credits parse:', error);
     },
   });
 })();

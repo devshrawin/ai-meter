@@ -1,17 +1,10 @@
 (() => {
   const AM = globalThis.AIMeter;
-  const adapter = AM.adapters.find((a) =>
-    a.hosts.some((h) => location.hostname === h || location.hostname.endsWith('.' + h)));
-  if (!adapter || window.top !== window) return;
+  if (window.top !== window) return;
 
-  let settings = AM.mergeSettings(null);
-  const reqSubs = [];
-  const resSubs = [];
-  const groups = {};
-  let injectOk = false;
-  const NOISE = /\/_data\/|cdn-cgi|\/rum\b|analytics|telemetry|statsig|sentry|segment|amplitude|datadog|\/log(s|ging)?\b|\/events?\b|\/t\/?$/i;
-
-  // Debug log records the structure of a request body (key names, model-ish values), never message text.
+  const host = location.hostname;
+  const NOISE = /\/_data\/|cdn-cgi|\/rum\b|analytics|telemetry|statsig|sentry|segment|amplitude|datadog|event_logging|\/log(s|ging)?\b|\/events?\b|\/t\/?$/i;
+  // Debug log records the structure of a request body (key names, model-like values), never message text.
   const MODELISH = /model|mode|kind|type|effort|reasoning/i;
   const bodyShape = (body) => {
     const j = AM.safeJSON(body);
@@ -25,6 +18,14 @@
     return 'keys: ' + parts.join(', ');
   };
 
+  let settings = AM.mergeSettings(null);
+  let adapter = null;
+  let injectOk = false;
+  const reqSubs = [];
+  const resSubs = [];
+  const groups = {};
+  const pending = [];
+
   const alive = () => {
     try { return !!chrome.runtime?.id; } catch { return false; }
   };
@@ -35,17 +36,19 @@
   const safe = (fn, arg) => {
     try { fn(arg); } catch (e) { console.warn('[AI Meter]', e); }
   };
+  const dlog = (entry) => {
+    if (settings.debug && alive()) AM.debugLog({ provider: adapter ? adapter.id : host, ...entry });
+  };
 
   const ctx = {
-    quotas: () => settings.quotas[adapter.id] || AM.DEFAULT_QUOTAS[adapter.id] || [],
+    quotas: () => settings.quotas[adapter.id] || AM.defaultQuotasFor(adapter.id, settings),
     onRequest: (fn) => reqSubs.push(fn),
     onResponse: (fn) => resSubs.push(fn),
     visible: () => document.visibilityState === 'visible',
     log: (...a) => {
       if (!settings.debug) return;
       console.log('[AI Meter]', adapter.id, ...a);
-      const text = a.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))).join(' ').slice(0, 3000);
-      if (alive()) AM.debugLog({ provider: adapter.id, kind: 'note', url: location.host, body: text });
+      dlog({ kind: 'note', url: host, body: a.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))).join(' ').slice(0, 3000) });
     },
     report(group, meters) {
       groups[group] = meters || [];
@@ -69,41 +72,58 @@
   }
 
   function publish() {
+    if (!adapter) return;
     const meters = current();
     AM.widget.update(adapter.name, meters, settings);
     send({ type: 'aimeter:usage', provider: adapter.id, name: adapter.name, meters });
   }
 
-  window.addEventListener('message', (e) => {
-    if (e.source !== window || !e.data || e.data.source !== 'aimeter-inject') return;
-    const d = e.data;
+  function handle(d) {
     if (d.kind === 'pong') {
       injectOk = true;
-      if (settings.debug && alive()) AM.debugLog({ provider: adapter.id, kind: 'status', url: location.host, body: `network hook active (fetch hooked: ${d.fetchHooked})` });
+      dlog({ kind: 'status', url: host, body: `network hook active (fetch hooked: ${d.fetchHooked})` });
       return;
     }
     if (d.kind === 'request') {
       reqSubs.forEach((f) => safe(f, d));
-      if (settings.debug && (d.method === 'POST' || d.method === 'WS') && !NOISE.test(d.url) && alive()) {
-        AM.debugLog({ provider: adapter.id, kind: 'request', method: d.method, url: d.url.split('?')[0], body: bodyShape(d.body) });
+      if ((d.method === 'POST' || d.method === 'WS') && !NOISE.test(d.url)) {
+        dlog({ kind: 'request', method: d.method, url: d.url.split('?')[0], body: bodyShape(d.body) });
       }
     } else if (d.kind === 'response') {
-      resSubs.forEach((f) => safe(f, d));
-      if (settings.debug && alive()) {
-        AM.debugLog({ provider: adapter.id, kind: 'response', method: d.method, status: d.status, url: d.url.split('?')[0], body: (d.body || '').slice(0, 3000) });
+      if (!d.shapeOnly) resSubs.forEach((f) => safe(f, d));
+      if (d.status === 429) {
+        const wait = AM.toTime(d.retryAfter, 'rel');
+        ctx.report('ratelimit', [{ id: 'ratelimit', label: 'Rate limited', pct: 100, source: 'banner', seenAt: Date.now(), resetAt: wait }]);
       }
+      dlog({
+        kind: 'response', method: d.method, status: d.status, url: d.url.split('?')[0],
+        body: d.binary ? `(binary, ${Math.round((d.body || '').length * 0.75)} bytes)` : (d.shapeOnly ? 'shape: ' : '') + (d.body || '').slice(0, 3000),
+      });
     }
+  }
+
+  window.addEventListener('message', (e) => {
+    if (e.source !== window || !e.data || e.data.source !== 'aimeter-inject') return;
+    if (adapter) handle(e.data);
+    else if (pending.length < 200) pending.push(e.data);
   });
 
+  function checkHook() {
+    window.postMessage({ source: 'aimeter-content', kind: 'ping', debug: !!settings.debug }, location.origin);
+    setTimeout(() => {
+      if (!injectOk) dlog({ kind: 'status', url: host, body: 'network hook NOT active — request/response capture unavailable on this page' });
+    }, 3000);
+  }
+
   chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
-    if (msg && msg.type === 'aimeter:refresh') {
+    if (msg && msg.type === 'aimeter:refresh' && adapter) {
       Promise.resolve(adapter.refresh && adapter.refresh()).finally(() => reply({ ok: true }));
       return true;
     }
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== 'local' || !changes.settings) return;
+    if (area !== 'local' || !changes.settings || !adapter) return;
     const wasDebug = settings.debug;
     settings = AM.mergeSettings(changes.settings.newValue);
     if (settings.debug !== wasDebug) checkHook();
@@ -111,21 +131,15 @@
     publish();
   });
 
-  function checkHook() {
-    window.postMessage({ source: 'aimeter-content', kind: 'ping', debug: !!settings.debug }, location.origin);
-    setTimeout(() => {
-      if (!injectOk && settings.debug && alive()) {
-        AM.debugLog({ provider: adapter.id, kind: 'status', url: location.host, body: 'network hook NOT active — request/response capture unavailable on this page' });
-      }
-    }, 3000);
-  }
-
   AM.loadSettings()
     .catch(() => AM.mergeSettings(null))
     .then((s) => {
       settings = s;
+      adapter = AM.adapterFor(host, settings);
+      if (!adapter) return;
       adapter.init(ctx);
       AM.banner.watch(ctx);
+      pending.splice(0).forEach(handle);
       publish();
       checkHook();
     });

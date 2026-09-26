@@ -1,8 +1,8 @@
-// Perplexity: picks up remaining-query counters from the app's own settings / rate-limit
-// calls when present (real), otherwise counts queries locally (estimate).
+// Perplexity: GET /rest/rate-limit/all → remaining_pro / remaining_research / remaining_labs (real).
 (() => {
   const AM = globalThis.AIMeter;
   const LIMITS_RE = /\/rest\/(rate-limit|user\/settings)/;
+  const LABELS = { Pro: 'Pro searches', Research: 'Research', 'Agentic Research': 'Agentic research', Labs: 'Labs' };
 
   AM.register({
     id: 'perplexity',
@@ -20,13 +20,16 @@
         if (d.method !== 'POST' || !/\/rest\/sse\/perplexity_ask/.test(d.url)) return;
         const b = AM.safeJSON(d.body);
         this.est.record(b?.params?.mode || b?.params?.model_preference || b?.mode || '');
+        clearTimeout(this.t);
+        this.t = setTimeout(() => this.refresh(), 5000);
       });
       this.est.refresh();
       this.refresh();
+      setInterval(() => ctx.visible() && this.refresh(), 120000);
     },
 
     parse(j) {
-      const meters = AM.findLimits(j);
+      const meters = AM.findLimits(j).map((m) => ({ ...m, label: LABELS[m.label] || m.label }));
       if (meters.length) this.ctx.report('real', meters);
     },
 
