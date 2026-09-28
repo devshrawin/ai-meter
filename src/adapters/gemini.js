@@ -28,6 +28,13 @@
       this.est.refresh();
       this.refresh();
       setInterval(() => ctx.visible() && this.refresh(), 120000);
+      AM.watchDomChat(ctx, {
+        selector: 'user-query, model-response',
+        ratio: 0.25,
+        // Gemini's limits are compute-based and each turn re-reads the whole chat.
+        next: (tokens) => tokens,
+        note: 'Longer chats use more of your Gemini limit',
+      });
     },
 
     remember(d) {

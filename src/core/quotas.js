@@ -27,6 +27,7 @@
     'src/core/store.js',
     'src/core/banner.js',
     'src/core/widget.js',
+    'src/core/chatdom.js',
     'src/adapters/claude.js',
     'src/adapters/chatgpt.js',
     'src/adapters/gemini.js',
@@ -89,6 +90,7 @@
   AM.DEFAULT_SETTINGS = {
     widget: true,
     chatStats: true,
+    pet: true,
     notify: true,
     thresholds: [75, 90, 100],
     debug: false,

@@ -82,6 +82,7 @@ function readQuotas() {
 function renderGeneral() {
   $('widget').checked = settings.widget;
   $('chatStats').checked = settings.chatStats;
+  $('pet').checked = settings.pet;
   $('notify').checked = settings.notify;
   $('debug').checked = settings.debug;
   $('thresholds').value = settings.thresholds.join(', ');
@@ -106,6 +107,7 @@ async function save() {
       ...settings,
       widget: $('widget').checked,
       chatStats: $('chatStats').checked,
+      pet: $('pet').checked,
       notify: $('notify').checked,
       debug: $('debug').checked,
       thresholds: thresholds.length ? thresholds : AM.DEFAULT_SETTINGS.thresholds,

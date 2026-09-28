@@ -46,6 +46,11 @@
       this.est.refresh();
       this.refresh();
       setInterval(() => ctx.visible() && this.refresh(), 120000);
+      AM.watchDomChat(ctx, {
+        selector: '[data-message-author-role]',
+        ratio: 0.25,
+        note: 'ChatGPT limits count messages, not chat length',
+      });
     },
 
     // The access token lives only in memory and is only sent back to chatgpt.com.

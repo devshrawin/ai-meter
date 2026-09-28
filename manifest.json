@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AI Meter",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "See how much of your usage limit is left on Claude, ChatGPT, Gemini, Grok, Perplexity, Kimi and other AI chat sites.",
   "permissions": ["storage", "alarms", "notifications", "scripting"],
   "host_permissions": [
@@ -91,6 +91,7 @@
         "src/core/store.js",
         "src/core/banner.js",
         "src/core/widget.js",
+        "src/core/chatdom.js",
         "src/adapters/claude.js",
         "src/adapters/chatgpt.js",
         "src/adapters/gemini.js",
