@@ -59,9 +59,16 @@
     .kv { display: flex; justify-content: space-between; gap: 8px; margin: 3px 0; }
     .kv span:last-child { text-align: right; }
     .note { font-size: 11px; color: var(--muted); margin-top: 4px; }
-    .foot { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; }
-    .iris-toggle { font: inherit; font-size: 11px; color: var(--muted); background: none; border: 0; padding: 2px 4px; cursor: pointer; border-radius: 6px; }
-    .iris-toggle:hover { color: var(--fg); background: var(--track); }
+    .foot { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; }
+    .iris-btn { display: inline-flex; align-items: center; gap: 7px; font: inherit; font-size: 12px; font-weight: 600;
+      color: var(--fg); background: var(--track); border: 1px solid var(--line); border-radius: 999px;
+      padding: 3px 12px 3px 3px; cursor: pointer; transition: background .15s, border-color .15s, transform .1s; }
+    .iris-btn:hover { background: color-mix(in srgb, #9a80e0 14%, var(--track)); border-color: color-mix(in srgb, #9a80e0 45%, var(--line)); }
+    .iris-btn:active { transform: scale(.97); }
+    .iris-btn:focus-visible { outline: 2px solid #9a80e0; outline-offset: 2px; }
+    .iris-face { width: 22px; height: 22px; object-fit: cover; object-position: 50% 12%; border-radius: 50%;
+      background: #fff; border: 1px solid var(--line); transition: filter .2s, opacity .2s; }
+    .iris-btn.away .iris-face { filter: grayscale(1); opacity: .6; }
   ` + AM.PET_CSS;
 
   let host = null;
@@ -230,9 +237,15 @@
     }
     if (AM.setSetting) {
       const foot = el('div', 'foot');
-      const link = el('button', 'iris-toggle', petOn ? 'Send Iris home' : 'Bring Iris back');
-      link.addEventListener('click', () => AM.setSetting('pet', !petOn));
-      foot.append(link);
+      const btn = el('button', 'iris-btn' + (petOn ? '' : ' away'));
+      btn.type = 'button';
+      btn.title = petOn ? 'Iris goes home and the meter stays' : 'Iris comes back to the meter';
+      const face = el('img', 'iris-face');
+      face.alt = '';
+      try { face.src = chrome.runtime.getURL('src/assets/iris/sit.webp'); } catch {}
+      btn.append(face, el('span', null, petOn ? 'Send Iris home' : 'Bring Iris back'));
+      btn.addEventListener('click', () => AM.setSetting('pet', !petOn));
+      foot.append(btn);
       panel.append(foot);
     }
     panelBox.append(panel);
