@@ -171,12 +171,32 @@
 
   AM.level = (pct) => (pct == null ? 'none' : pct >= 90 ? 'high' : pct >= 75 ? 'mid' : 'low');
 
-  AM.topMeter = (meters) => {
-    let top = null;
-    for (const m of meters || []) {
-      const p = AM.pctOf(m);
-      if (p != null && (top == null || p > AM.pctOf(top))) top = m;
-    }
-    return top || (meters && meters[0]) || null;
+  // Window length in hours, from explicit data or the meter's id/label; unknown sorts between day and week.
+  AM.windowHours = (m) => {
+    if (m.windowHours > 0) return m.windowHours;
+    const s = `${m.id} ${m.label}`.toLowerCase();
+    if (/five_hour|session/.test(s)) return 5;
+    const h = s.match(/(\d+)\s*h\b/);
+    if (h) return Number(h[1]);
+    if (/week|seven_day|7d/.test(s)) return 168;
+    if (/month|30d/.test(s)) return 720;
+    return 100;
   };
+
+  // What the pill and badge show: the shortest-window (session) limit, unless another limit is already
+  // exhausted — then that one, since it's what's actually blocking.
+  AM.primaryMeter = (meters) => {
+    const list = (meters || []).filter((m) => AM.pctOf(m) != null || m.remaining != null || m.used != null);
+    if (!list.length) return (meters && meters[0]) || null;
+    const blocked = list.filter((m) => AM.pctOf(m) >= 100);
+    const pool = blocked.length ? blocked : list;
+    return pool.reduce((best, m) => {
+      const a = AM.windowHours(m);
+      const b = AM.windowHours(best);
+      if (a !== b) return a < b ? m : best;
+      return (AM.pctOf(m) ?? -1) > (AM.pctOf(best) ?? -1) ? m : best;
+    });
+  };
+
+  AM.sortMeters = (meters) => (meters || []).slice().sort((a, b) => AM.windowHours(a) - AM.windowHours(b));
 })();

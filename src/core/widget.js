@@ -102,9 +102,10 @@
     if (!root) return;
     const wrap = root.querySelector('.wrap');
     wrap.textContent = '';
-    const { name, meters } = last;
+    const { name } = last;
+    const meters = AM.sortMeters(last.meters);
     const now = Date.now();
-    const top = AM.topMeter(meters);
+    const top = AM.primaryMeter(meters);
     const topPct = top ? AM.pctOf(top) : null;
 
     if (expanded) {

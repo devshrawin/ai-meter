@@ -109,6 +109,21 @@ test('mergeSettings keeps defaults for missing providers', () => {
   assert.equal(s.quotas.chatgpt.length, 2);
 });
 
+test('primaryMeter prefers the session window over a fuller weekly one', () => {
+  const session = { id: 'five_hour', label: 'Session (5h)', pct: 1 };
+  const weekly = { id: 'seven_day', label: 'Weekly', pct: 15 };
+  assert.equal(AM.primaryMeter([weekly, session]).id, 'five_hour');
+  assert.equal(AM.primaryMeter([{ id: 'codex-604800', label: 'Codex · Weekly', pct: 50 }, { id: 'codex-18000', label: 'Codex · 5h', pct: 2 }]).id, 'codex-18000');
+  assert.equal(AM.primaryMeter([{ id: 'messages', label: 'Messages', used: 3, limit: 160, windowHours: 3 }, { id: 'thinking', label: 'Thinking', used: 900, limit: 3000, windowHours: 168 }]).id, 'messages');
+});
+
+test('primaryMeter switches to whatever limit is exhausted', () => {
+  const ms = [{ id: 'five_hour', label: 'Session (5h)', pct: 30 }, { id: 'seven_day', label: 'Weekly', pct: 100 }];
+  assert.equal(AM.primaryMeter(ms).id, 'seven_day');
+  assert.equal(AM.primaryMeter([]), null);
+  assert.equal(AM.sortMeters([ms[1], ms[0]])[0].id, 'five_hour');
+});
+
 test('formatDuration', () => {
   assert.equal(AM.formatDuration(30 * 60e3), '30m');
   assert.equal(AM.formatDuration(90 * 60e3), '1h 30m');

@@ -38,7 +38,7 @@ async function render() {
     h.append(el('small', null, 'updated ' + ago(entry.updatedAt)));
     card.append(h);
     if (!entry.meters.length) card.append(el('div', 'none', 'No data yet — send a message.'));
-    for (const m of entry.meters) {
+    for (const m of AM.sortMeters(entry.meters)) {
       const pct = AM.pctOf(m);
       const row = el('div', 'row');
       const top = el('div', 'top');

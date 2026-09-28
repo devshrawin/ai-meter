@@ -10,7 +10,7 @@ async function getSettings() {
 }
 
 function setBadge(tabId, meters) {
-  const top = AM.topMeter(meters);
+  const top = AM.primaryMeter(meters);
   const pct = top ? AM.pctOf(top) : null;
   const text = pct != null ? String(Math.round(pct)) : top ? '•' : '';
   chrome.action.setBadgeText({ tabId, text }).catch(() => {});
