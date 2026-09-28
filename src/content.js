@@ -27,9 +27,7 @@
   const groups = {};
   const pending = [];
 
-  const alive = () => {
-    try { return !!chrome.runtime?.id; } catch { return false; }
-  };
+  const alive = () => AM.alive();
   const send = (msg) => {
     if (!alive()) return;
     try { chrome.runtime.sendMessage(msg).catch(() => {}); } catch {}
@@ -60,6 +58,7 @@
       publish();
     },
     async getJSON(url, init) {
+      if (AM.dead) throw new Error('AI Meter was reloaded');
       const r = await fetch(url, { credentials: 'include', ...(init || {}) });
       if (!r.ok) throw new Error(`${r.status} ${url}`);
       return r.json();
@@ -77,7 +76,7 @@
   }
 
   function publish() {
-    if (!adapter) return;
+    if (!adapter || !alive()) return;
     const meters = current();
     AM.widget.update(adapter.name, meters, settings, settings.chatStats ? chat : null);
     send({ type: 'aimeter:usage', provider: adapter.id, name: adapter.name, meters });
@@ -108,7 +107,7 @@
   }
 
   window.addEventListener('message', (e) => {
-    if (e.source !== window || !e.data || e.data.source !== 'aimeter-inject') return;
+    if (AM.dead || e.source !== window || !e.data || e.data.source !== 'aimeter-inject') return;
     if (adapter) handle(e.data);
     else if (pending.length < 200) pending.push(e.data);
   });

@@ -224,7 +224,9 @@
   }
 
   AM.widget = {
+    destroy: unmount,
     update(name, meters, settings, chat) {
+      if (AM.dead) return;
       last = { name, meters, chat: chat || null };
       if (!settings.widget) return unmount();
       if (!host) {
