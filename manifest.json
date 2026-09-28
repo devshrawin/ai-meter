@@ -1,9 +1,14 @@
 {
   "manifest_version": 3,
   "name": "AI Meter",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "See how much of your usage limit is left on Claude, ChatGPT, Gemini, Grok, Perplexity, Kimi and other AI chat sites.",
-  "permissions": ["storage", "alarms", "notifications", "scripting"],
+  "permissions": [
+    "storage",
+    "alarms",
+    "notifications",
+    "scripting"
+  ],
   "host_permissions": [
     "https://claude.ai/*",
     "https://chatgpt.com/*",
@@ -22,8 +27,12 @@
     "https://meta.ai/*",
     "https://poe.com/*"
   ],
-  "optional_host_permissions": ["https://*/*"],
-  "background": { "service_worker": "src/background.js" },
+  "optional_host_permissions": [
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
   "action": {
     "default_popup": "src/popup/popup.html",
     "default_title": "AI Meter",
@@ -61,7 +70,9 @@
         "https://meta.ai/*",
         "https://poe.com/*"
       ],
-      "js": ["src/inject.js"],
+      "js": [
+        "src/inject.js"
+      ],
       "world": "MAIN",
       "run_at": "document_start"
     },
@@ -90,6 +101,7 @@
         "src/core/parsers.js",
         "src/core/store.js",
         "src/core/banner.js",
+        "src/core/iris-frames.js",
         "src/core/pet.js",
         "src/core/widget.js",
         "src/core/chatdom.js",
@@ -103,6 +115,17 @@
         "src/content.js"
       ],
       "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/assets/iris/*.webp"
+      ],
+      "matches": [
+        "https://*/*"
+      ],
+      "use_dynamic_url": true
     }
   ]
 }

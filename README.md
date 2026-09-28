@@ -36,6 +36,25 @@ Every site also gets two free signals: the site's own limit notices (banner watc
 
 Estimate limits change often and differ by plan — set yours in **Settings → Estimate rules**.
 
+## Iris
+
+Iris, a white Persian with odd eyes, lives on top of the meter. She sits, blinks, grooms and walks
+along the pill. Now and then she teeters off the edge, tumbles, sits dazed and leaps back up. Her
+mood follows your session limit: calm, then worried, then stressed, and asleep in a loaf at 100%.
+Click her for a reaction (eight quick clicks for a special one). You can turn her off in Settings.
+She pauses in hidden tabs and sits still if you have reduced motion turned on.
+
+She's drawn from 20 sprite frames in `src/assets/iris/`, cut from the reference sheets in `art/source/` by
+
+```bash
+python scripts/build-sprites.py   # needs Pillow + numpy
+```
+
+The script removes the drawn pill, hearts and motion lines, matches every frame to one scale using
+the pill width, and writes each frame's size and pill-top anchor to `src/core/iris-frames.js`. To
+use cleaner art later, drop in per-pose transparent PNGs and rerun. The animation code only reads
+the frames by name.
+
 ## Adding any AI site
 
 Settings → **Other AI sites** → enter the hostname (e.g. `chat.example.com`), optional limit + window → **Add site**. Chrome asks for access to that one site only (`optional_host_permissions`); AI Meter then registers its scripts there with `chrome.scripting.registerContentScripts`. Remove the site to revoke access.
