@@ -28,6 +28,7 @@
       });
       ctx.onRequest((d) => {
         if (d.method === 'POST' && /\/completion(\?|$)/.test(d.url)) {
+          AM.emit('send');
           clearTimeout(this.t1);
           clearTimeout(this.t2);
           this.t1 = setTimeout(() => this.refresh(), 5000);

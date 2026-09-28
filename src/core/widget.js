@@ -139,21 +139,27 @@
       try { target.setPointerCapture(e.pointerId); } catch {}
     });
     target.addEventListener('pointermove', (e) => {
-      if (!start) return;
+      // Grabbing Iris herself is always a click, never a drag (she may be perched far from the pill).
+      if (!start || start.onPet) return;
       const dx = e.clientX - start.x;
       const dy = e.clientY - start.y;
       if (!start.moved && Math.hypot(dx, dy) < 4) return;
+      if (!start.moved && pet) pet.setDragging(true);
       start.moved = true;
       host.style.right = Math.max(0, Math.min(innerWidth - 60, start.right - dx)) + 'px';
       host.style.bottom = Math.max(0, Math.min(innerHeight - 30, start.bottom - dy)) + 'px';
     });
-    target.addEventListener('pointerup', () => {
+    const end = () => {
       if (!start) return;
-      if (start.moved) savePos({ right: parseInt(host.style.right, 10), bottom: parseInt(host.style.bottom, 10) });
-      else if (start.onPet && pet) pet.react();
+      if (start.moved) {
+        savePos({ right: parseInt(host.style.right, 10), bottom: parseInt(host.style.bottom, 10) });
+        if (pet) pet.setDragging(false);
+      } else if (start.onPet && pet) pet.react();
       else { expanded = !expanded; render(); }
       start = null;
-    });
+    };
+    target.addEventListener('pointerup', end);
+    target.addEventListener('pointercancel', () => { if (start && start.moved && pet) pet.setDragging(false); start = null; });
   }
 
   function cacheState(chat, now) {
@@ -258,6 +264,7 @@
         document.body.appendChild(host);
       }
       setPet(settings.pet !== false);
+      if (pet) pet.setExplore(settings.explore !== false);
       render();
     },
   };

@@ -141,6 +141,7 @@
       settings = s;
       adapter = AM.adapterFor(host, settings);
       if (!adapter) return;
+      AM.siteId = adapter.id;
       adapter.init(ctx);
       AM.banner.watch(ctx);
       pending.splice(0).forEach(handle);

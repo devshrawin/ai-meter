@@ -20,6 +20,11 @@
 
   const isInvalidated = (e) => /context invalidated/i.test((e && e.message) || String(e));
 
+  // Page-level events other parts react to: 'send' (a message went out), 'limit' (the site showed
+  // its own limit notice).
+  AM.bus = new EventTarget();
+  AM.emit = (type, detail) => { if (!AM.dead) AM.bus.dispatchEvent(new CustomEvent(type, { detail })); };
+
   AM.dead = false;
   AM.shutdown = () => {
     if (AM.dead) return;
@@ -116,7 +121,7 @@
     const report = (events) => { if (!AM.dead) ctx.report('estimate', AM.countMeters(events, ctx.quotas())); };
     const safe = (p) => p.then(report).catch((e) => { if (!isInvalidated(e)) console.warn('[AI Meter]', e); });
     return {
-      record: (model) => safe(AM.events.record(provider, model)),
+      record: (model) => { AM.emit('send'); return safe(AM.events.record(provider, model)); },
       relabelLast: (model) => safe(AM.events.relabelLast(provider, model)),
       refresh: () => safe(AM.events.list(provider)),
     };

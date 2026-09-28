@@ -28,6 +28,8 @@
           if (!text || text.length > 300) continue;
           if (LIMIT_RE.test(text)) {
             ctx.log('limit notice', text);
+            AM.lastLimitEl = el;
+            AM.emit('limit', { el });
             ctx.report('banner', [{
               id: 'banner', label: 'Limit reached', pct: 100, source: 'banner',
               resetAt: AM.parseReset(text), seenAt: Date.now(), note: text.slice(0, 160),

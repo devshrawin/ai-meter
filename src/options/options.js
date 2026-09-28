@@ -83,6 +83,7 @@ function renderGeneral() {
   $('widget').checked = settings.widget;
   $('chatStats').checked = settings.chatStats;
   $('pet').checked = settings.pet;
+  $('explore').checked = settings.explore;
   $('notify').checked = settings.notify;
   $('debug').checked = settings.debug;
   $('thresholds').value = settings.thresholds.join(', ');
@@ -108,6 +109,7 @@ async function save() {
       widget: $('widget').checked,
       chatStats: $('chatStats').checked,
       pet: $('pet').checked,
+      explore: $('explore').checked,
       notify: $('notify').checked,
       debug: $('debug').checked,
       thresholds: thresholds.length ? thresholds : AM.DEFAULT_SETTINGS.thresholds,

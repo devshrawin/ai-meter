@@ -13,14 +13,17 @@
   const BOX_H = 66;
 
   AM.PET_CSS = `
+    /* Only her visible frame takes clicks, so she never blocks the page around her. */
     .pet { position: absolute; left: 0; bottom: calc(100% - 4px); width: ${BOX_W}px; height: ${BOX_H}px;
-      cursor: pointer; will-change: transform; z-index: 1; }
+      pointer-events: none; will-change: transform; z-index: 1; }
+    .pet img.on { pointer-events: auto; cursor: pointer; }
+    .pet.air img.on { pointer-events: none; }
     .pet .face { position: absolute; inset: 0; transform-origin: 50% 100%; }
     .pet .bob { position: absolute; inset: 0; transform-origin: 50% 100%; transition: transform .12s ease-in-out;
       filter: drop-shadow(0 .5px .8px rgba(70, 70, 100, .45)) drop-shadow(0 2px 3px rgba(40, 40, 80, .14)); }
     /* Every frame stays laid out (so it's decoded up front); only opacity changes. A new frame appears
        instantly on top while the previous one fades out beneath it — no flash, no see-through gap. */
-    .pet img { position: absolute; opacity: 0; z-index: 1; pointer-events: none; user-select: none; -webkit-user-drag: none;
+    .pet img { position: absolute; opacity: 0; z-index: 1; user-select: none; -webkit-user-drag: none;
       transition: opacity var(--fade, .12s) ease-out; }
     .pet img.on { opacity: 1; z-index: 2; transition: none; }
     .pet.walking { --fade: .09s; }
@@ -286,9 +289,249 @@
       await jumpUp();
     }
 
+    // --- trips: hopping off the pill onto the page itself ---
+    const ROOM_ABOVE = 70;  // clear space she needs above an edge to stand on it
+    let explore = true;
+    let dragging = false;
+    let trip = null;        // { kind, el, broken }
+    let pendingTrip = null; // { run, at }
+    let nextIdleTrip = Date.now() + rand(60e3, 180e3);
+
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    // The pet box's resting origin, in viewport px: its left edge and the pill-top line it stands on.
+    // (The pet sits inside the pill's 1px border, 4px below its top edge.)
+    const origin = () => { const r = pill.getBoundingClientRect(); return { left: r.left + 1, line: r.top + 5 }; };
+    // Where she stands on an element: its top edge, or the bottom edge for a header bar.
+    const lineOf = (target, kind) => { const r = target.getBoundingClientRect(); return { r, y: kind === 'header' ? r.bottom : r.top }; };
+    const perchable = (target, kind) => {
+      if (!target) return false;
+      const { r, y: line } = lineOf(target, kind);
+      return r.width >= BOX_W + 16 && line >= ROOM_ABOVE && line <= innerHeight - 8 && r.left >= -1 && r.right <= innerWidth + 1;
+    };
+    const canTrip = () => explore && !reduce && alive && !document.hidden && !dragging && mood !== 'sleep';
+    const find = (kind) => AM.findPerch && AM.findPerch(kind, AM.siteId, BOX_W + 16);
+
+    // Wait up to `ms`, returning early (false) if `ok()` stops holding.
+    const hold = async (ms, ok) => {
+      const end = Date.now() + ms;
+      while (Date.now() < end) {
+        if (!ok()) return false;
+        await sleep(120);
+      }
+      return true;
+    };
+
+    // Crouch, arc-jump to (tx, ty) in pill-relative px, land.
+    async function leap(tx, ty) {
+      const dx = tx - x;
+      faceTo(dx || dir);
+      show('crouch');
+      await sleep(260);
+      show('jump');
+      air(true);
+      const dist = Math.hypot(dx, ty - y);
+      const apex = Math.min(y, ty) - 30 - Math.min(70, dist * 0.12);
+      const ok = await move([
+        { transform: T(x, y) },
+        { transform: T((x + tx) / 2, apex), offset: 0.5 },
+        { transform: T(tx, ty) },
+      ], { duration: Math.min(1200, 540 + dist * 0.8), easing: 'cubic-bezier(.3,.6,.4,1)' });
+      air(false);
+      if (!ok) return false;
+      x = tx;
+      y = ty;
+      place();
+      show('crouch');
+      await squash();
+      idle();
+      return true;
+    }
+
+    // The perch gave way: tumble to the bottom of the window and sit there dazed.
+    async function tumble() {
+      stopWalkCycle();
+      const floor = innerHeight - 4 - origin().line;
+      const ground = Math.max(y + 12, floor);
+      const d = ground - y;
+      show('fall');
+      particle(pick(['oof', 'eep!', '!?']), { tone: 'dark' });
+      air(true);
+      await move([
+        { transform: T(x, y, 'rotate(0deg)') },
+        { transform: T(x + dir * 8, y + d * 0.3, `rotate(${dir * 22}deg)`), offset: 0.35 },
+        { transform: T(x + dir * 14, ground, `rotate(${dir * 6}deg)`) },
+      ], { duration: Math.min(1000, 380 + Math.sqrt(d) * 26), easing: 'cubic-bezier(.5,0,.9,.55)' });
+      air(false);
+      x += dir * 14;
+      y = ground;
+      place();
+      show('dazed');
+      await squash();
+      particle('✦', { dx: -10, tone: 'gold' });
+      particle('✦', { dx: 12, delay: 180, tone: 'gold' });
+      await sleep(rand(1100, 1700));
+    }
+
+    // Keep checking the perch every frame; if it scrolls, resizes, moves or disappears, she falls.
+    function watchPerch(t) {
+      const target = t.el;
+      const start = lineOf(target, t.kind);
+      const check = () => {
+        if (trip !== t || t.broken || t.el !== target) return;
+        if (!target.isConnected || !(AM.isVisible ? AM.isVisible(target) : true)) t.broken = 'gone';
+        else {
+          const now = lineOf(target, t.kind);
+          if (Math.abs(now.y - start.y) > 2 || Math.abs(now.r.left - start.r.left) > 2 || Math.abs(now.r.width - start.r.width) > 2) t.broken = 'moved';
+        }
+        if (t.broken) interrupt();
+        else requestAnimationFrame(check);
+      };
+      requestAnimationFrame(check);
+    }
+
+    // Jump onto `target`, landing near where she is now, and start watching it.
+    async function perchOn(t, target) {
+      t.el = target;
+      const { r, y: line } = lineOf(target, t.kind);
+      const o = origin();
+      const here = o.left + x + BOX_W / 2;
+      const cx = clamp(here + rand(-70, 70), r.left + BOX_W / 2 + 8, r.right - BOX_W / 2 - 8);
+      if (!(await leap(cx - BOX_W / 2 - o.left, line - o.line))) return false;
+      if (t.broken) return false;
+      watchPerch(t);
+      return true;
+    }
+
+    // Horizontal range she can walk on the current perch, in pill-relative px.
+    const perchRange = (t) => {
+      const { r } = lineOf(t.el, t.kind);
+      const o = origin();
+      return [r.left + 6 - o.left, r.right - BOX_W - 6 - o.left];
+    };
+
+    async function runTrip(kind, target, stay) {
+      busy = true;
+      breathe(false);
+      el.classList.remove('lying');
+      const t = { kind, el: target, broken: null };
+      trip = t;
+      try {
+        if (!(await perchOn(t, target))) return;
+        await stay(t);
+        if (t.broken && t.broken !== 'recall') await tumble();
+      } finally {
+        trip = null;
+        if (t.broken === 'recall') {
+          const b = bounds();
+          x = clamp(x, b.min, b.max);
+          y = 0;
+          place();
+          idle();
+        } else if (alive) {
+          const b = bounds();
+          await leap(clamp(x, b.min, b.max), 0);
+        }
+        busy = false;
+        next(rand(2500, 5000));
+      }
+    }
+
+    // Run a trip now, or as soon as she's free (dropped if it's gone stale).
+    function requestTrip(run) {
+      if (!canTrip() || trip) return;
+      if (busy || reacting || inAir) pendingTrip = { run, at: Date.now() };
+      else run();
+    }
+    function runPending() {
+      const p = pendingTrip;
+      pendingTrip = null;
+      if (p && Date.now() - p.at < 12000 && canTrip() && !trip) setTimeout(p.run, 60);
+    }
+
+    const stayIdle = async (t) => {
+      const [lo, hi] = perchRange(t);
+      await walkTo(clamp(x + rand(-90, 90), lo, hi));
+      const end = Date.now() + rand(5000, 20000);
+      while (!t.broken && Date.now() < end) {
+        const r = Math.random();
+        if (r < 0.3) { show('groom'); await hold(rand(1500, 2500), () => !t.broken); idle(); }
+        else if (r < 0.5) await walkTo(clamp(x + rand(-60, 60), lo, hi));
+        else if (r < 0.62) { show('mew'); particle(pick(['mew', 'nya'])); await hold(900, () => !t.broken); idle(); }
+        else { idle(); await hold(rand(1500, 3000), () => !t.broken); }
+      }
+    };
+
+    // Sit on the composer watching the reply; when it's done, greet the new message, then go home.
+    const stayReply = async (t) => {
+      show(mood === 'happy' ? 'sit-happy' : 'sit-worried');
+      await hold(1400, () => !t.broken);
+      if (mood === 'happy') idle();
+      const t0 = Date.now();
+      let started = false;
+      while (!t.broken && Date.now() - t0 < 180e3) {
+        const replying = AM.isReplying ? AM.isReplying(AM.siteId) : false;
+        if (replying) started = true;
+        if (!replying && (started || Date.now() - t0 > 8000)) {
+          await hold(1200, () => !t.broken);
+          if (!(AM.isReplying && AM.isReplying(AM.siteId))) break;
+        }
+        await sleep(300);
+      }
+      if (t.broken) return;
+      const msg = find('lastMessage');
+      if (msg && msg !== t.el && perchable(msg, 'lastMessage')) {
+        t.kind = 'lastMessage';
+        if (!(await perchOn(t, msg))) return;
+        show('mew');
+        particle(pick(['mew!', 'nya~', 'ooh']));
+        await hold(1300, () => !t.broken);
+        idle();
+        await hold(900, () => !t.broken);
+      } else {
+        show('sit-happy');
+        particle('♥');
+        await hold(900, () => !t.broken);
+      }
+    };
+
+    const stayAlarm = async (t) => {
+      show('sit-stressed');
+      particle('!', { tone: 'dark' });
+      await hold(700, () => !t.broken);
+      particle('!!', { tone: 'dark' });
+      await hold(rand(2200, 3200), () => !t.broken);
+    };
+
+    const tripTo = (kind, stay, targetKinds) => () => {
+      if (!canTrip() || trip || busy || reacting) return;
+      for (const k of targetKinds) {
+        const target = find(k);
+        if (perchable(target, k)) return runTrip(k === 'composer' ? 'composer' : k, target, stay);
+      }
+    };
+    const replyTrip = tripTo('reply', stayReply, ['composer']);
+    const alarmTrip = tripTo('alarm', stayAlarm, ['limitBanner', 'composer']);
+
+    const onSend = () => requestTrip(replyTrip);
+    const onLimit = () => requestTrip(alarmTrip);
+    if (AM.bus) {
+      AM.bus.addEventListener('send', onSend);
+      AM.bus.addEventListener('limit', onLimit);
+    }
+
     async function tick() {
       if (!alive) return;
       if (document.hidden || busy || reacting) return next(2000);
+      if (pendingTrip) return runPending();
+      // Idle explorer: at most one trip every 1-3 minutes, only from the pill, never mid-typing.
+      if (canTrip() && y === 0 && Date.now() > nextIdleTrip && !(AM.recentlyTyped && AM.recentlyTyped(6000))) {
+        nextIdleTrip = Date.now() + rand(60e3, 180e3);
+        const kinds = Math.random() < 0.35 ? ['header', 'composer'] : ['composer', 'header'];
+        for (const k of kinds) {
+          const target = find(k);
+          if (perchable(target, k)) return runTrip(k, target, stayIdle);
+        }
+      }
       busy = true;
       try {
         if (mood === 'sleep') {
@@ -319,7 +562,8 @@
         else idle();
       } finally {
         busy = false;
-        next(mood === 'sleep' ? 6000 : rand(2200, 5600));
+        if (pendingTrip) runPending();
+        else next(mood === 'sleep' ? 6000 : rand(2200, 5600));
       }
     }
 
@@ -386,7 +630,8 @@
         }
       } finally {
         reacting = false;
-        next(1600);
+        if (pendingTrip && !trip) runPending();
+        else next(1600);
       }
     }
 
@@ -400,7 +645,10 @@
       react,
       setMood(m) {
         if (m === mood) return;
+        const prev = mood;
         mood = m;
+        // Crossing into 90%+: raise the alarm once.
+        if (m === 'stressed' && prev !== 'stressed' && prev !== 'sleep') setTimeout(() => requestTrip(alarmTrip), 400);
         if (m !== 'sleep') {
           el.classList.remove('lying');
           breathe(false);
@@ -412,8 +660,27 @@
       nudge() {
         if (!busy && !reacting && !inAir && y === 0 && x > bounds().max) next(100);
       },
+      setExplore(on) { explore = !!on; },
+      // The pill is being dragged: no new trips, and an ongoing one snaps her back onto it.
+      setDragging(on) {
+        dragging = !!on;
+        if (on && trip) {
+          trip.broken = 'recall';
+          interrupt();
+          const b = bounds();
+          x = clamp(x, b.min, b.max);
+          y = 0;
+          place();
+          idle();
+        }
+      },
+      get tripping() { return !!trip; },
       destroy() {
         alive = false;
+        if (AM.bus) {
+          AM.bus.removeEventListener('send', onSend);
+          AM.bus.removeEventListener('limit', onLimit);
+        }
         clearTimeout(timer);
         clearTimeout(blinkTimer);
         stopWalkCycle();

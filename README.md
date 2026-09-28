@@ -44,6 +44,15 @@ mood follows your session limit: calm, then worried, then stressed, and asleep i
 Click her for a reaction (eight quick clicks for a special one). You can turn her off in Settings.
 She pauses in hidden tabs and sits still if you have reduced motion turned on.
 
+**Trips** (Settings → "Let Iris explore the page", on by default): Iris leaves the pill for the page itself.
+- **Reply watcher:** when you send a message she hops onto the chat box and watches until the reply finishes.
+- **Greeter:** when the reply is done she hops onto the new message and mews, then goes home.
+- **Limit alarm:** when the site shows its own limit notice, or usage crosses 90%, she stands on it looking stressed, with a "!".
+- **Idle explorer:** at most one wander every 1–3 minutes, onto the chat box or header. Never while you're typing, never in a hidden tab, never with reduced motion.
+- **Falls:** while she's perched, the spot is re-measured every frame. If it scrolls, resizes, moves or disappears, she falls, sits dazed and climbs back.
+
+She only stands on top edges. Only her visible sprite takes clicks, so the page stays usable, and dragging the pill calls her home. Where she can stand on each site is in `src/core/perches.js`: selectors verified live on 2026-09-28 (signed out) for ChatGPT, Gemini, Grok, Perplexity, Kimi, Qwen and Meta AI. Other sites use a generic finder that looks for the lowest text box and its styled container.
+
 She's drawn from 20 sprite frames in `src/assets/iris/`, cut from the reference sheets in `art/source/` by
 
 ```bash
