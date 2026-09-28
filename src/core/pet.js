@@ -16,9 +16,17 @@
     .pet { position: absolute; left: 0; bottom: calc(100% - 4px); width: ${BOX_W}px; height: ${BOX_H}px;
       cursor: pointer; will-change: transform; z-index: 1; }
     .pet .face { position: absolute; inset: 0; transform-origin: 50% 100%; }
-    .pet img { position: absolute; display: none; pointer-events: none; user-select: none; -webkit-user-drag: none;
+    .pet .bob { position: absolute; inset: 0; transform-origin: 50% 100%; transition: transform .12s ease-in-out;
       filter: drop-shadow(0 .5px .8px rgba(70, 70, 100, .45)) drop-shadow(0 2px 3px rgba(40, 40, 80, .14)); }
-    .pet img.on { display: block; }
+    /* Every frame stays laid out (so it's decoded up front); only opacity changes. A new frame appears
+       instantly on top while the previous one fades out beneath it — no flash, no see-through gap. */
+    .pet img { position: absolute; opacity: 0; z-index: 1; pointer-events: none; user-select: none; -webkit-user-drag: none;
+      transition: opacity var(--fade, .12s) ease-out; }
+    .pet img.on { opacity: 1; z-index: 2; transition: none; }
+    .pet.walking { --fade: .09s; }
+    .pet.idle .bob { animation: pet-breathe 3.6s ease-in-out infinite; }
+    .pet.lying .bob { animation: pet-breathe 4.4s ease-in-out infinite; }
+    @keyframes pet-breathe { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(.994, 1.014); } }
     .pet .shadow { position: absolute; left: 50%; bottom: -3px; width: 44px; height: 7px; margin-left: -22px;
       border-radius: 50%; background: radial-gradient(closest-side, rgba(40, 40, 80, .22), rgba(40, 40, 80, 0));
       transition: opacity .2s, transform .2s; pointer-events: none; }
@@ -52,6 +60,9 @@
     el.title = 'Iris — click to pet';
     const face = document.createElement('div');
     face.className = 'face';
+    const bob = document.createElement('div');
+    bob.className = 'bob';
+    face.append(bob);
     const shadow = document.createElement('div');
     shadow.className = 'shadow';
     el.append(shadow, face);
@@ -64,7 +75,8 @@
       img.decoding = 'async';
       img.src = chrome.runtime.getURL(`src/assets/iris/${name}.webp`);
       img.style.cssText = `width:${f.w}px;height:${f.h}px;left:${BOX_W / 2 - f.ax}px;bottom:${-f.ay}px`;
-      face.append(img);
+      bob.append(img);
+      if (img.decode) img.decode().catch(() => {});
       imgs[name] = img;
     }
     pill.append(el);
@@ -86,12 +98,14 @@
     let clicks = [];
 
     // --- frames ---
+    const RESTING = new Set(['sit', 'sit-blink', 'sit-worried', 'sit-stressed']);
     const show = (name) => {
       if (!imgs[name]) name = 'sit';
       if (cur === name) return applyDir();
       if (cur) imgs[cur].classList.remove('on');
       imgs[name].classList.add('on');
       cur = name;
+      el.classList.toggle('idle', RESTING.has(name));
       applyDir();
     };
     const applyDir = () => {
@@ -101,13 +115,25 @@
     const idleFrame = () => (mood === 'sleep' ? 'sleep' : mood === 'worried' ? 'sit-worried' : mood === 'stressed' ? 'sit-stressed' : 'sit');
     const idle = () => show(idleFrame());
 
+    // Legs cycle through the 4 walk frames; the body dips on each footfall (frames 1 and 3).
     const startWalkCycle = () => {
       let i = 0;
+      el.classList.add('walking');
       show(WALK[0]);
+      bob.style.transform = 'translateY(0)';
       clearInterval(walkTimer);
-      walkTimer = setInterval(() => show(WALK[++i % WALK.length]), mood === 'stressed' ? 85 : 135);
+      walkTimer = setInterval(() => {
+        i = (i + 1) % WALK.length;
+        show(WALK[i]);
+        bob.style.transform = i % 2 ? 'translateY(-1.2px)' : 'translateY(0)';
+      }, mood === 'stressed' ? 90 : 125);
     };
-    const stopWalkCycle = () => { clearInterval(walkTimer); walkTimer = null; };
+    const stopWalkCycle = () => {
+      clearInterval(walkTimer);
+      walkTimer = null;
+      el.classList.remove('walking');
+      bob.style.transform = '';
+    };
 
     const scheduleBlink = () => {
       clearTimeout(blinkTimer);
@@ -195,7 +221,9 @@
       faceTo(dx);
       startWalkCycle();
       const speed = mood === 'stressed' ? 52 : 28;
-      const ok = await move([{ transform: T(x, y) }, { transform: T(tx, y) }], { duration: (Math.abs(dx) / speed) * 1000, easing: 'linear' });
+      // Near-linear so feet don't skate, with a gentle start and stop.
+      const ok = await move([{ transform: T(x, y) }, { transform: T(tx, y) }],
+        { duration: (Math.abs(dx) / speed) * 1000 + 160, easing: 'cubic-bezier(.35,.08,.65,.92)' });
       stopWalkCycle();
       if (ok) {
         x = tx;

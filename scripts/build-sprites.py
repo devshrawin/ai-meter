@@ -49,7 +49,24 @@ FRAMES = [
 # Frames drawn without a pill under them; separate pills (walk, jump) are dropped as detached shapes.
 NO_PILL = {"fall", "dazed"}
 
-SIT_DISPLAY_H = 66   # on-screen height of the sitting pose, CSS px
+# The sheets draw moving poses smaller than the sitting pose. Head size (ear tip to mouth, measured
+# against `sit`) is the true reference, so scale each pose up to match it.
+SCALE_FIX = {
+    "walk-1": 1.42, "walk-2": 1.42, "walk-3": 1.42, "walk-4": 1.42,
+    "crouch": 1.22, "sleep": 1.22, "sleep-2": 1.22, "teeter": 1.12,
+    "jump": 1.24, "fall": 1.22, "stretch": 1.22,
+}
+
+# Groups that must hold still relative to a reference frame when swapped. "fit" also searches scale,
+# for variants of the same pose drawn at slightly different sizes (the second sheet's sits).
+ALIGN = [
+    ("sit", ["sit-blink", "sit-happy", "sit-worried", "sit-stressed", "mew", "purr", "groom"], True),
+    ("walk-1", ["walk-2", "walk-3", "walk-4"], False),
+    ("sleep", ["sleep-2"], True),
+]
+SINK = 1.5  # CSS px a standing frame sinks into the pill so paws look planted
+
+SIT_DISPLAY_H = 64   # on-screen height of the sitting pose, CSS px
 STORE_X = 2          # stored at 2x for sharp rendering on high-DPI screens
 
 
@@ -135,6 +152,47 @@ def matte_grey(rgb):
     return fg.astype(np.uint8), alpha
 
 
+def overlap(ref_a, ref_ax, a, ax, dx):
+    """IoU of two silhouettes, bottom-aligned, anchors offset by dx (store px)."""
+    H = max(ref_a.shape[0], a.shape[0])
+    W = ref_a.shape[1] + a.shape[1] + 200
+    origin = W // 2
+
+    def place(m, left):
+        c = np.zeros((H, W), bool)
+        left = max(0, min(W - m.shape[1], left))
+        c[H - m.shape[0]:, left:left + m.shape[1]] = m
+        return c
+
+    r = place(ref_a, int(round(origin - ref_ax)))
+    c = place(a, int(round(origin - ax + dx)))
+    union = np.logical_or(r, c).sum()
+    return np.logical_and(r, c).sum() / union if union else 0.0
+
+
+def fit(ref, cand_img, cand_ax, base_scale, search_scale):
+    """Best (scale multiplier, dx) placing `cand_img` over `ref` with the most silhouette overlap."""
+    scales = np.arange(0.86, 1.161, 0.02) if search_scale else [1.0]
+    best = (1.0, 0, -1.0)
+    for m in scales:
+        W = max(1, round(cand_img.size[0] * base_scale * m))
+        H = max(1, round(cand_img.size[1] * base_scale * m))
+        a = np.array(cand_img.getchannel("A").resize((W, H), Image.BILINEAR)) > 127
+        ax = cand_ax * base_scale * m
+        for dx in range(-40, 41, 2):
+            iou = overlap(ref["alpha"], ref["ax"], a, ax, dx)
+            if iou > best[2]:
+                best = (float(m), dx, iou)
+    m, dx, _ = best
+    for fine in (dx - 1, dx + 1):  # refine the 2px step
+        W = max(1, round(cand_img.size[0] * base_scale * m))
+        H = max(1, round(cand_img.size[1] * base_scale * m))
+        a = np.array(cand_img.getchannel("A").resize((W, H), Image.BILINEAR)) > 127
+        if overlap(ref["alpha"], ref["ax"], a, cand_ax * base_scale * m, fine) > best[2]:
+            best = (m, fine, overlap(ref["alpha"], ref["ax"], a, cand_ax * base_scale * m, fine))
+    return best
+
+
 def cut(name, sheet_img, box, sheet_no, has_pill):
     crop = sheet_img.crop(box)
     if sheet_no == 1:
@@ -197,25 +255,49 @@ def main():
     sit = cuts["sit"][1]["cat"]
     k = (SIT_DISPLAY_H * STORE_X) / (sit[3] - sit[1])
 
-    manifest = {"scale": STORE_X, "frames": {}}
+    # Per frame: cropped source, base scale, and anchor x (source px from the crop's left edge).
+    frames = {}
     for name, (img, info, sheet_no, grounded) in cuts.items():
-        s = k * rel.get(sheet_no, 1.0)
         x0, y0, x1, y1 = info["cat"]
-        if grounded and "pill" in info:
-            p = info["pill"]
-            anchor_x, baseline = (p[0] + p[2]) / 2, p[1]
-        else:
-            anchor_x, baseline = (x0 + x1) / 2, y1
-        frame = img.crop((x0, y0, x1, y1))
-        W, H = max(1, round((x1 - x0) * s)), max(1, round((y1 - y0) * s))
-        frame = frame.resize((W, H), Image.LANCZOS)
-        frame.save(OUT / f"{name}.webp", "WEBP", quality=92, method=6)
+        anchor_x = (info["pill"][0] + info["pill"][2]) / 2 if grounded and "pill" in info else (x0 + x1) / 2
+        frames[name] = {
+            "src": img.crop((x0, y0, x1, y1)),
+            "scale": k * rel.get(sheet_no, 1.0) * SCALE_FIX.get(name, 1.0),
+            "ax_src": anchor_x - x0,
+            "dx": 0,
+            "grounded": grounded,
+        }
+
+    def render(f):
+        W = max(1, round(f["src"].size[0] * f["scale"]))
+        H = max(1, round(f["src"].size[1] * f["scale"]))
+        return f["src"].resize((W, H), Image.LANCZOS)
+
+    def silhouette(f):
+        im = render(f)
+        return {"alpha": np.array(im.getchannel("A")) > 127, "ax": f["ax_src"] * f["scale"] - f["dx"]}
+
+    # Hold swapped frames still: fit each group member onto its reference by overlap.
+    for ref_name, members, search_scale in ALIGN:
+        ref = silhouette(frames[ref_name])
+        for name in members:
+            f = frames[name]
+            m, dx, iou = fit(ref, f["src"], f["ax_src"], f["scale"], search_scale)
+            f["scale"] *= m
+            f["dx"] = dx
+            print(f"fit {name:13s} -> {ref_name:7s} scale x{m:.2f} dx {dx:+d}px  overlap {iou:.2f}")
+
+    manifest = {"scale": STORE_X, "frames": {}}
+    for name, f in frames.items():
+        im = render(f)
+        im.save(OUT / f"{name}.webp", "WEBP", quality=92, method=6)
         manifest["frames"][name] = {
-            "w": round(W / STORE_X, 1),
-            "h": round(H / STORE_X, 1),
-            # anchor: where the pill-top centre sits, measured from the image's left / bottom edge
-            "ax": round((anchor_x - x0) * s / STORE_X, 1),
-            "ay": round((y1 - baseline) * s / STORE_X, 1),
+            "w": round(im.size[0] / STORE_X, 1),
+            "h": round(im.size[1] / STORE_X, 1),
+            # anchor: the point that sits on the pill, from the image's left / bottom edge. Grounded
+            # frames stand on their own lowest paw, sunk a little into the pill, so they never bob.
+            "ax": round((f["ax_src"] * f["scale"] - f["dx"]) / STORE_X, 1),
+            "ay": SINK if f["grounded"] else 0,
         }
     (OUT / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     # Same data as a content-script module, so the extension needn't fetch the JSON at runtime.
