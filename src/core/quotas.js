@@ -28,6 +28,7 @@
     'src/core/banner.js',
     'src/core/perches.js',
     'src/core/iris-frames.js',
+    'src/core/walk8-frames.js',
     'src/core/pet.js',
     'src/core/widget.js',
     'src/core/chatdom.js',

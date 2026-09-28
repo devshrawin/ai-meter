@@ -1,305 +1,454 @@
-// Iris, a white Persian who lives on top of the meter pill. Drawn from sprite frames in
-// src/assets/iris (built by scripts/build-sprites.py; sizes/anchors in AM.IRIS_FRAMES).
-// She sits, blinks, grooms, walks along the pill, sometimes teeters off the edge, tumbles, sits
-// dazed and leaps back up. Mood follows usage; clicking her plays a reaction.
+// Iris — smooth engine (from the Claude Design handoff), plus trips onto the page.
+// API: AM.PET_CSS, AM.createPet(pill, hostEl) → { el, react, play, setMood, nudge, setExplore, setDragging, destroy }.
+// The smoothness comes from ONE requestAnimationFrame clock driving everything:
+//  • walk frames advance by distance travelled (no foot-skate) and adjacent frames blend sub-frame
+//  • spring squash/stretch + tilt on every pose change, take-off and landing (hides pose pops)
+//  • ballistic arcs for jump / fall / hop with velocity-based stretch and lean
+//  • turns animate the mirror (scaleX through 0) instead of snapping; front frames never mirror
+//  • continuous breathing, sleep frames cross-breathe, stressed tremble, dizzy sway
+//  • all timing on a virtual clock (AM.irisTimeScale for slow-mo), cancellable behaviours
 (() => {
   const AM = globalThis.AIMeter;
-  const F = () => AM.IRIS_FRAMES || {};
-  // Front-facing frames are never mirrored, so her blue and amber eyes stay on the right sides.
   const FRONT = new Set(['sit', 'sit-blink', 'sit-happy', 'sit-worried', 'sit-stressed', 'mew', 'purr', 'groom', 'dazed', 'fall']);
+  const REST = new Set(['sit', 'sit-blink', 'sit-happy', 'sit-worried', 'sit-stressed', 'mew', 'purr', 'groom']);
   const WALK = ['walk-1', 'walk-2', 'walk-3', 'walk-4'];
-
+  const WALK8 = ['walk8-1', 'walk8-2', 'walk8-3', 'walk8-4', 'walk8-5', 'walk8-6', 'walk8-7', 'walk8-8'];
   const BOX_W = 48;
   const BOX_H = 66;
+  const CANCEL = Symbol('cancel');
 
-  AM.PET_CSS = `
-    /* Only her visible frame takes clicks, so she never blocks the page around her. */
-    .pet { position: absolute; left: 0; bottom: calc(100% - 4px); width: ${BOX_W}px; height: ${BOX_H}px;
-      pointer-events: none; will-change: transform; z-index: 1; }
-    .pet img.on { pointer-events: auto; cursor: pointer; }
-    .pet.air img.on { pointer-events: none; }
-    .pet .face { position: absolute; inset: 0; transform-origin: 50% 100%; }
-    .pet .bob { position: absolute; inset: 0; transform-origin: 50% 100%; transition: transform .12s ease-in-out;
+  const CSS = `
+    /* Only her visible frame takes clicks (set per frame in render), so she never blocks the page. */
+    .pet { position: absolute; left: 0; top: auto; bottom: calc(100% - 4px); width: ${BOX_W}px; height: ${BOX_H}px;
+      pointer-events: none; z-index: 1; will-change: transform; -webkit-tap-highlight-color: transparent; }
+    .pet .rig { position: absolute; inset: 0; transform-origin: 50% 100%; will-change: transform;
       filter: drop-shadow(0 .5px .8px rgba(70, 70, 100, .45)) drop-shadow(0 2px 3px rgba(40, 40, 80, .14)); }
-    /* Every frame stays laid out (so it's decoded up front); only opacity changes. A new frame appears
-       instantly on top while the previous one fades out beneath it — no flash, no see-through gap. */
-    .pet img { position: absolute; opacity: 0; z-index: 1; user-select: none; -webkit-user-drag: none;
-      transition: opacity var(--fade, .12s) ease-out; }
-    .pet img.on { opacity: 1; z-index: 2; transition: none; }
-    .pet.walking { --fade: .09s; }
-    .pet.idle .bob { animation: pet-breathe 3.6s ease-in-out infinite; }
-    .pet.lying .bob { animation: pet-breathe 4.4s ease-in-out infinite; }
-    @keyframes pet-breathe { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(.994, 1.014); } }
-    .pet .shadow { position: absolute; left: 50%; bottom: -3px; width: 44px; height: 7px; margin-left: -22px;
-      border-radius: 50%; background: radial-gradient(closest-side, rgba(40, 40, 80, .22), rgba(40, 40, 80, 0));
-      transition: opacity .2s, transform .2s; pointer-events: none; }
-    .pet.air .shadow { opacity: 0; transform: scale(.5); }
-    .pet .z { position: absolute; display: none; font: 700 12px ui-sans-serif, system-ui, sans-serif; color: #9a9ab0; pointer-events: none; }
-    .pet.lying .z { display: block; }
-    .pet .z1 { right: -4px; top: 18px; animation: pet-zz 2.4s ease-in-out infinite; }
-    .pet .z2 { right: -12px; top: 8px; font-size: 9px; animation: pet-zz 2.4s ease-in-out 1.2s infinite; }
+    .pet img { position: absolute; opacity: 0; pointer-events: none; cursor: pointer; user-select: none; -webkit-user-drag: none; }
+    .pet .shadow { position: absolute; left: 50%; bottom: -3px; width: 44px; height: 7px; margin-left: -22px; border-radius: 50%;
+      background: radial-gradient(closest-side, rgba(40, 40, 80, .22), rgba(40, 40, 80, 0)); pointer-events: none; will-change: transform, opacity; }
     .pet .fx { position: absolute; left: 50%; top: -6px; pointer-events: none; font: 700 14px ui-sans-serif, system-ui, sans-serif;
-      color: #f07fa8; white-space: nowrap; animation: pet-float 1.25s ease-out forwards; z-index: 2;
-      text-shadow: 0 1px 0 #fff, 0 0 4px rgba(255,255,255,.95); }
+      color: #f07fa8; white-space: nowrap; z-index: 3; opacity: 0; text-shadow: 0 1px 0 #fff, 0 0 4px rgba(255,255,255,.95); }
     .pet .fx.dark { color: #6b6680; }
     .pet .fx.gold { color: #e8b93c; }
-    @keyframes pet-zz { 0% { opacity: 0; transform: translate(0,4px); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(8px,-10px); } }
-    @keyframes pet-float { 0% { opacity: 0; transform: translate(-50%,0) scale(.6); } 20% { opacity: 1; transform: translate(-50%,-8px) scale(1.12); }
-      100% { opacity: 0; transform: translate(calc(-50% + var(--dx,0px)), -40px); } }
-    @media (prefers-reduced-motion: reduce) { .pet *, .pet { animation: none !important; transition: none !important; } }
+    .pet .fx.z { color: #9a9ab0; font-size: 11px; }
   `;
 
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const rand = (a, b) => a + Math.random() * (b - a);
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const smooth = (a, b, v) => { const t = clamp((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+  const ease = (t) => t * t * (3 - 2 * t);
+  const spring = (k, c, x) => ({ x, v: 0, t: x, k, c });
+  const stepSpring = (s, h) => { s.v += (-s.k * (s.x - s.t) - s.c * s.v) * h; s.x += s.v * h; };
 
-  AM.createPet = (pill, hostEl) => {
-    const frames = F();
+  AM.PET_SMOOTH_CSS = CSS;
+  AM.createPetSmooth = (pill, hostEl) => {
+    const frames = AM.IRIS_FRAMES || {};
     if (!frames.sit) return null;
     const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const TS = () => AM.irisTimeScale || 1;
 
     const el = document.createElement('div');
     el.className = 'pet';
     el.title = 'Iris — click to pet';
-    const face = document.createElement('div');
-    face.className = 'face';
-    const bob = document.createElement('div');
-    bob.className = 'bob';
-    face.append(bob);
     const shadow = document.createElement('div');
     shadow.className = 'shadow';
-    el.append(shadow, face);
-    el.insertAdjacentHTML('beforeend', '<span class="z z1">z</span><span class="z z2">z</span>');
+    const rig = document.createElement('div');
+    rig.className = 'rig';
+    el.append(shadow, rig);
 
     const imgs = {};
     for (const [name, f] of Object.entries(frames)) {
       const img = document.createElement('img');
       img.alt = '';
       img.decoding = 'async';
-      img.src = chrome.runtime.getURL(`src/assets/iris/${name}.webp`);
-      img.style.cssText = `width:${f.w}px;height:${f.h}px;left:${BOX_W / 2 - f.ax}px;bottom:${-f.ay}px`;
-      bob.append(img);
+      img.src = chrome.runtime.getURL(`src/assets/iris/${f.file || name + '.webp'}`);
+      img.style.cssText = `width:${f.w}px;height:${f.h}px;left:${BOX_W / 2 - f.ax}px;bottom:${-f.ay}px;transform-origin:${f.ax}px 100%`;
+      img._o = 0; img._z = 0; img._f = 1; img._p = 'none';
+      rig.append(img);
       if (img.decode) img.decode().catch(() => {});
       imgs[name] = img;
     }
     pill.append(el);
 
-    let cur = null;
-    let dir = 1;
-    let x = 0;
-    let y = 0;
-    let mood = 'happy';
-    let alive = true;
-    let busy = false;
-    let reacting = false;
-    let inAir = false;
-    let anim = null;
-    let timer = null;
-    let walkTimer = null;
-    let blinkTimer = null;
-    let breathTimer = null;
-    let clicks = [];
+    // ---- state ----
+    let alive = true, gen = 0, now = 0, last = performance.now(), raf = 0;
+    let x = 0, y = 0, dir = 1, vel = 0, phase = 0;
+    let mood = 'happy', busy = false, reacting = false, inAir = false, walking = false, sleeping = false;
+    let base = 'sit', over = null, overT = 0, overA = 0, fadeMs = 120;
+    let walkOn = false, sleepOn = false, sleepT0 = 0, nextZ = 0;
+    let piv = 0, pivT = 0, bob = 0, breathAmp = 0, shadowA = 1, brainWake = 900, clicks = [];
+    // Turn-swap: front<->side changes happen while she's squeezed thin (a turn), never as a crossfade.
+    let sqz = 1, sqzStart = -1, sqzPose = null, hopS = 1, gaitAmp = 0;
+    const SQZ_MS = 190;
+    const gait = () => { const g = AM.irisGait || 'walk8'; return g === 'walk8' && !frames['walk8-1'] ? 'hop' : g; };
+    const HOP = frames['walk8-1'] ? 'walk8-1' : 'walk-2';
+    const cycle = () => (gait() === 'walk8' ? WALK8 : WALK);
+    const sq = spring(420, 13, 1);   // squash/stretch (y scale), bouncy
+    const rot = spring(180, 17, 0);  // tilt, degrees
+    const fl = spring(900, 54, 1);   // mirror, -1..1 (animates through 0 on a turn)
+    const kick = (v) => { sq.v += v; };
 
-    // --- frames ---
-    const RESTING = new Set(['sit', 'sit-blink', 'sit-worried', 'sit-stressed']);
-    const show = (name) => {
-      if (!imgs[name]) name = 'sit';
-      if (cur === name) return applyDir();
-      if (cur) imgs[cur].classList.remove('on');
-      imgs[name].classList.add('on');
-      cur = name;
-      el.classList.toggle('idle', RESTING.has(name));
-      applyDir();
+    // ---- virtual-clock tasks (cancelled when gen changes, unless persistent) ----
+    const tasks = new Set();
+    const task = (dur, fn, persist) => new Promise((res, rej) => tasks.add({ start: now, dur, fn, res, rej, g: persist ? null : gen }));
+    const W = (ms) => task(ms);
+    const tween = (ms, fn) => task(ms, fn);
+    const run = (fn, persist) => task(Infinity, fn, persist);
+
+    // ---- poses ----
+    const shown = () => (over && overA >= 0.5 ? over : base);
+    const pose = (n, ms = 130) => {
+      if (!imgs[n]) n = 'sit';
+      walkOn = false;
+      sleepOn = false;
+      if (sqzPose) { sqzPose = n; return; }
+      base = shown();
+      if (ms > 0 && !reduce && base !== n && FRONT.has(base) !== FRONT.has(n)) {
+        over = null; overT = 0; overA = 0;
+        sqzPose = n; sqzStart = now;
+        return;
+      }
+      over = null; overT = 0; overA = 0;
+      if (base === n) return;
+      if (ms <= 0) { base = n; return; }
+      over = n; fadeMs = ms;
     };
-    const applyDir = () => {
-      face.style.transform = dir < 0 && !FRONT.has(cur) ? 'scaleX(-1)' : '';
-    };
-    const faceTo = (d) => { if (d) { dir = d < 0 ? -1 : 1; applyDir(); } };
     const idleFrame = () => (mood === 'sleep' ? 'sleep' : mood === 'worried' ? 'sit-worried' : mood === 'stressed' ? 'sit-stressed' : 'sit');
-    const idle = () => show(idleFrame());
+    const faceTo = (d) => { if (d) { dir = d < 0 ? -1 : 1; fl.t = dir; } };
+    const setAir = (on) => { inAir = on; pivT = on ? 26 : 0; };
+    const bounds = () => { const w = pill.offsetWidth; return { min: 4, max: Math.max(4, w - BOX_W - 4), w, h: pill.offsetHeight }; };
+    const roomFor = (side) => { const r = hostEl.getBoundingClientRect(); return side < 0 ? r.left > BOX_W + 30 : innerWidth - r.right > BOX_W + 30; };
 
-    // Legs cycle through the 4 walk frames; the body dips on each footfall (frames 1 and 3).
-    const startWalkCycle = () => {
-      let i = 0;
-      el.classList.add('walking');
-      show(WALK[0]);
-      bob.style.transform = 'translateY(0)';
-      clearInterval(walkTimer);
-      walkTimer = setInterval(() => {
-        i = (i + 1) % WALK.length;
-        show(WALK[i]);
-        bob.style.transform = i % 2 ? 'translateY(-1.2px)' : 'translateY(0)';
-      }, mood === 'stressed' ? 90 : 125);
-    };
-    const stopWalkCycle = () => {
-      clearInterval(walkTimer);
-      walkTimer = null;
-      el.classList.remove('walking');
-      bob.style.transform = '';
-    };
-
-    const scheduleBlink = () => {
-      clearTimeout(blinkTimer);
-      blinkTimer = setTimeout(async () => {
-        if (!alive) return;
-        if (cur === 'sit' && !busy && !reacting && !document.hidden) {
-          show('sit-blink');
-          await sleep(140);
-          if (cur === 'sit-blink') show('sit');
-          if (Math.random() < 0.25) { await sleep(160); if (cur === 'sit') { show('sit-blink'); await sleep(120); if (cur === 'sit-blink') show('sit'); } }
-        }
-        scheduleBlink();
-      }, rand(2600, 6000));
-    };
-
-    const breathe = (on) => {
-      clearInterval(breathTimer);
-      breathTimer = null;
-      if (!on) return;
-      let b = false;
-      breathTimer = setInterval(() => {
-        if (cur === 'sleep' || cur === 'sleep-2') show((b = !b) ? 'sleep-2' : 'sleep');
-      }, 1700);
-    };
-
-    // --- motion helpers ---
-    const T = (tx, ty, extra = '') => `translate(${tx}px, ${ty}px) ${extra}`;
-    const place = () => { el.style.transform = T(x, y); };
-    const air = (on) => { inAir = on; el.classList.toggle('air', on); };
-    const bounds = () => {
-      const w = pill.offsetWidth;
-      return { min: 4, max: Math.max(4, w - BOX_W - 4), w, h: pill.offsetHeight };
-    };
-    const roomFor = (side) => {
-      const r = hostEl.getBoundingClientRect();
-      return side < 0 ? r.left > BOX_W + 30 : innerWidth - r.right > BOX_W + 30;
-    };
-
-    const particle = (text, { dx = 0, delay = 0, tone = '' } = {}) => {
+    const particle = (text, { dx = 0, delay = 0, tone = '', x0 = 0, y0 = -6, rise = 40, dur = 1250 } = {}) => {
       setTimeout(() => {
         if (!alive) return;
         const p = document.createElement('span');
         p.className = 'fx' + (tone ? ' ' + tone : '');
         p.textContent = text;
-        p.style.setProperty('--dx', dx + 'px');
+        p.style.left = `calc(50% + ${x0}px)`;
+        p.style.top = y0 + 'px';
         el.append(p);
-        setTimeout(() => p.remove(), 1350);
-      }, delay);
+        const a = p.animate([
+          { opacity: 0, transform: 'translate(-50%, 0) scale(.5)' },
+          { opacity: 1, transform: `translate(calc(-50% + ${dx * 0.3}px), -10px) scale(1.15)`, offset: 0.2, easing: 'cubic-bezier(.2,.8,.3,1)' },
+          { opacity: 0, transform: `translate(calc(-50% + ${dx}px), -${rise}px) scale(.9)` },
+        ], { duration: dur / TS(), easing: 'cubic-bezier(.3,.6,.5,1)', fill: 'forwards' });
+        a.onfinish = () => p.remove();
+      }, delay / TS());
     };
 
-    const move = async (keyframes, opts) => {
-      anim = el.animate(keyframes, { fill: 'forwards', ...opts });
-      try {
-        await anim.finished;
-      } catch {
+    // ---- the clock ----
+    const update = (ms) => {
+      const s = ms / 1000;
+      for (const t of [...tasks]) {
+        if (t.g !== null && t.g !== gen) { tasks.delete(t); t.rej(CANCEL); continue; }
+        let done;
+        if (t.dur === Infinity) done = !!(t.fn && t.fn(s));
+        else { const p = Math.min(1, (now - t.start) / t.dur); if (t.fn) t.fn(p, s); done = p >= 1; }
+        if (done) { tasks.delete(t); t.res(); }
+      }
+      for (let h = s; h > 0; h -= 1 / 120) { const d = Math.min(h, 1 / 120); stepSpring(sq, d); stepSpring(rot, d); stepSpring(fl, d); }
+      piv += (pivT - piv) * Math.min(1, s * 14);
+
+      if (sqzStart >= 0) {
+        const t = (now - sqzStart) / SQZ_MS;
+        if (t >= 0.5 && sqzPose) { base = sqzPose; sqzPose = null; over = null; overA = 0; kick(0.7); }
+        if (t >= 1) { sqzStart = -1; sqz = 1; } else sqz = 1 - 0.88 * Math.sin(Math.PI * t);
+      }
+      hopS = 1;
+      if (walkOn && gait() === 'hop') {
+        base = HOP; over = null; overA = 0;
+        const a = Math.abs(Math.sin(Math.PI * phase));
+        bob = -2.6 * gaitAmp * a;
+        hopS = 1 - 0.045 * gaitAmp * Math.pow(1 - a, 5);          // squash on each paw contact
+        rot.t = -dir * 1.6 * gaitAmp * Math.cos(Math.PI * (phase % 1)); // nose up rising, down landing
+      } else if (walkOn) {
+        const C = cycle(), n = C.length, p = ((phase % n) + n) % n, i = Math.floor(p);
+        base = C[i]; over = C[(i + 1) % n];
+        overA = smooth(n === 8 ? 0.6 : 0.45, 1, p - i); // short blend into the next pose at the end of each frame
+        // 8-frame art already carries its own body bob; the old 4 frames need it added
+        bob = -(n === 8 ? 0.5 : 1.3) * gaitAmp * (0.5 - 0.5 * Math.cos((Math.PI * phase * 4) / n));
+        rot.t = 0;
+      } else {
+        bob *= Math.max(0, 1 - s * 12);
+        if (sleepOn) { base = 'sleep'; over = 'sleep-2'; overA = 0.5 - 0.5 * Math.cos((2 * Math.PI * (now - sleepT0)) / 3400); }
+        else if (over) {
+          overT += ms / fadeMs;
+          overA = ease(Math.min(1, overT));
+          if (overT >= 1) { base = over; over = null; overA = 0; overT = 0; }
+        }
+      }
+      const cur = shown();
+      const breathe = !reduce && !inAir && !walkOn && (REST.has(cur) || sleepOn) ? (sleepOn ? 1.3 : 1) : 0;
+      breathAmp += (breathe - breathAmp) * Math.min(1, s * 4);
+      shadowA += ((inAir ? 0 : 1) - shadowA) * Math.min(1, s * 14);
+      if (sleepOn && now > nextZ) {
+        particle('z', { tone: 'z', x0: 16, y0: 14, dx: 10, rise: 26, dur: 2200 });
+        nextZ = now + 1500;
+      }
+      if (trip && trip.watch && !trip.broken) checkPerch(trip);
+    };
+
+    const render = () => {
+      const period = sleepOn ? 4400 : mood === 'stressed' ? 1800 : 3600;
+      const br = breathAmp * Math.sin((2 * Math.PI * now) / period);
+      const sy = (sq.x + br * 0.012) * hopS * (1 + 0.05 * (1 - sqz));
+      const sx = (1 + (1 - sq.x) * 0.9 - br * 0.005 + (1 - hopS) * 0.8) * sqz;
+      const jx = mood === 'stressed' && breathAmp > 0.5 ? 0.35 * Math.sin(now * 0.09) : 0;
+      el.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0)`;
+      rig.style.transform = `translate3d(${jx.toFixed(2)}px, ${bob.toFixed(2)}px, 0) translateY(${-piv}px) rotate(${rot.x.toFixed(2)}deg) translateY(${piv}px) scale(${sx.toFixed(4)}, ${sy.toFixed(4)})`;
+      shadow.style.opacity = shadowA.toFixed(3);
+      shadow.style.transform = `scale(${(0.5 + 0.5 * shadowA) * sx}, 1)`;
+      const f = fl.x;
+      for (const n in imgs) {
+        const img = imgs[n];
+        const o = n === base ? 1 : n === over ? overA : 0;
+        if (img._o !== o) { img.style.opacity = o; img._o = o; }
+        const z = n === over ? 2 : 1;
+        if (img._z !== z) { img.style.zIndex = z; img._z = z; }
+        const pe = n === base && !inAir ? 'auto' : 'none';
+        if (img._p !== pe) { img.style.pointerEvents = pe; img._p = pe; }
+        if (o > 0 && !FRONT.has(n) && Math.abs(img._f - f) > 0.001) { img.style.transform = `scaleX(${f.toFixed(3)})`; img._f = f; }
+      }
+    };
+
+    const loop = (t) => {
+      if (!alive) return;
+      raf = requestAnimationFrame(loop);
+      const ms = Math.min(50, t - last) * TS();
+      last = t;
+      now += ms;
+      update(ms);
+      render();
+    };
+
+    // ---- behaviours ----
+    async function startWalk(d) {
+      kick(-0.9);                      // anticipation: dip before standing up
+      await W(90);
+      faceTo(d);
+      pose(gait() === 'hop' ? HOP : cycle()[0], 150);
+      kick(1.1);
+      await W(SQZ_MS);
+      walkOn = true; walking = true; phase = 0; gaitAmp = 0;
+    }
+
+    async function walkTo(tx, sitAfter = true) {
+      if (Math.abs(tx - x) < 2) return;
+      const d = Math.sign(tx - x);
+      if (!walking) await startWalk(d);
+      else if (d !== dir) { faceTo(d); kick(-0.5); }
+      const vmax = mood === 'stressed' ? 52 : 28;
+      const acc = vmax / 0.3;
+      const hopping = gait() === 'hop';
+      const eight = gait() === 'walk8';
+      // px per hop / per walk frame (8-frame cycle ≈ 12 fps calm, ≈ 16 fps stressed)
+      const stride = hopping ? (mood === 'stressed' ? 11 : 9) : eight ? (mood === 'stressed' ? 3.2 : 2.35) : mood === 'stressed' ? 4.4 : 3.5;
+      await run((s) => {
+        const rem = (tx - x) * d;
+        if (rem <= 0.2) return true;
+        vel = Math.max(3, Math.min(vel + acc * s, vmax, Math.sqrt(2 * acc * rem) + 1));
+        const step = Math.min(rem, vel * s);
+        x += step * d;
+        phase += step / stride;
+        gaitAmp = clamp(vel / vmax, 0, 1);
         return false;
-      }
-      anim.cancel();
-      anim = null;
-      return true;
-    };
-    const faceAnim = (keyframes, opts) => face.animate(keyframes, opts).finished.catch(() => {});
-    const squash = () => faceAnim(
-      [{ transform: `${face.style.transform} scale(1,1)` }, { transform: `${face.style.transform} scale(1.12,.86)` }, { transform: `${face.style.transform} scale(1,1)` }],
-      { duration: 280, easing: 'ease-out' });
-    const wobble = (deg, times, ms) => faceAnim(
-      [0, 1, 2, 3, 4].map((i) => ({ transform: `${face.style.transform} rotate(${i % 2 ? deg : i === 0 || i === 4 ? 0 : -deg}deg)` })),
-      { duration: ms, iterations: times, easing: 'ease-in-out' });
+      });
+      x = tx; vel = 0; gaitAmp = 0;
+      if (hopping) rot.t = 0;
+      if (sitAfter) await sitDown();
+    }
 
-    const interrupt = () => {
-      if (!anim) return;
-      const m = new DOMMatrixReadOnly(getComputedStyle(el).transform);
-      x = m.m41;
-      y = m.m42;
-      anim.cancel();
-      anim = null;
-      stopWalkCycle();
-      place();
-    };
-
-    // --- behaviours ---
-    async function walkTo(tx) {
-      const dx = tx - x;
-      if (Math.abs(dx) < 2) return true;
-      faceTo(dx);
-      startWalkCycle();
-      const speed = mood === 'stressed' ? 52 : 28;
-      // Near-linear so feet don't skate, with a gentle start and stop.
-      const ok = await move([{ transform: T(x, y) }, { transform: T(tx, y) }],
-        { duration: (Math.abs(dx) / speed) * 1000 + 160, easing: 'cubic-bezier(.35,.08,.65,.92)' });
-      stopWalkCycle();
-      if (ok) {
-        x = tx;
-        place();
-        idle();
-      }
-      return ok;
+    async function sitDown() {
+      walking = false;
+      pose(idleFrame(), 190);
+      kick(-1.1);
+      await W(280);
     }
 
     async function jumpUp() {
       const b = bounds();
       const land = x < 0 ? b.min : b.max;
-      faceTo(land - x);
-      show('crouch');
-      await sleep(300);
-      show('jump');
-      air(true);
-      await move([
-        { transform: T(x, y) },
-        { transform: T((x + land) / 2, -38), offset: 0.55 },
-        { transform: T(land, 0) },
-      ], { duration: 720, easing: 'cubic-bezier(.3,.7,.4,1)' });
-      air(false);
-      x = land;
-      y = 0;
-      place();
-      show('crouch');
-      await squash();
-      idle();
+      faceTo(land - x || 1);
+      rot.t = 0;
+      pose('crouch', 140);
+      kick(-1.8);
+      await W(320);
+      pose('jump', 80);
+      kick(2.2);
+      setAir(true);
+      const x0 = x, y0 = y, cx = (x0 + land) / 2, cy = -58;
+      await tween(640, (p) => {
+        const q = 1 - p;
+        x = q * q * x0 + 2 * q * p * cx + p * p * land;
+        y = q * q * y0 + 2 * q * p * cy;
+        const vx = 2 * q * (cx - x0) + 2 * p * (land - cx);
+        const vy = 2 * q * (cy - y0) + 2 * p * (0 - cy);
+        rot.t = clamp(Math.atan2(vy, Math.abs(vx) + 1) * 57.3 * 0.25, -16, 16) * dir;
+        sq.t = 1 + clamp(Math.abs(vy) / 1800, 0, 0.1);
+        if (p > 0.8 && over !== 'crouch' && base !== 'crouch') pose('crouch', 110);
+      });
+      x = land; y = 0;
+      setAir(false);
+      rot.t = 0; sq.t = 1;
+      kick(-2.8);
+      await W(170);
+      pose(idleFrame(), 210);
+      kick(-0.6);
+      await W(260);
     }
 
     async function fall(side) {
       const b = bounds();
       const edge = side < 0 ? -BOX_W * 0.5 : b.w - BOX_W * 0.5;
-      if (!(await walkTo(edge))) return;
+      await walkTo(edge, false);
+      walking = false;
       faceTo(side);
-      show('teeter');
+      pose('teeter', 110);
+      kick(-1.0);
       particle('!', { tone: 'dark' });
-      await wobble(7, 2, 360);
-      const gx = side < 0 ? -BOX_W - 10 : b.w + 10;
-      const gy = b.h;
-      show('fall');
-      air(true);
-      await move([
-        { transform: T(x, 0, 'rotate(0deg)') },
-        { transform: T((x + gx) / 2, gy * 0.2, `rotate(${side * 25}deg)`), offset: 0.4 },
-        { transform: T(gx, gy, `rotate(${side * 8}deg)`) },
-      ], { duration: 560, easing: 'cubic-bezier(.5,0,.9,.55)' });
-      air(false);
+      await tween(820, (p) => { rot.t = side * 6 * Math.sin(p * Math.PI * 4) * (0.6 + 0.4 * p); });
+      rot.t = side * 14;
+      await W(120);
+      pose('fall', 90);
+      setAir(true);
+      const gx = side < 0 ? -BOX_W - 10 : b.w + 10, gy = b.h;
+      let vx = side * 125, vy = -120;
+      await run((s) => {
+        vy += 1500 * s;
+        x += vx * s; y += vy * s;
+        if ((gx - x) * side < 0) { x = gx; vx = 0; }
+        rot.t = side * (10 + Math.min(18, Math.max(0, y) * 0.7));
+        sq.t = 1 + Math.min(0.1, Math.max(0, vy) / 3000);
+        if (y >= gy) { y = gy; return true; }
+        return false;
+      });
       x = gx;
-      y = gy;
-      place();
-      show('dazed');
-      await squash();
+      setAir(false);
+      rot.t = 0; sq.t = 1;
+      pose('dazed', 70);
+      kick(-3.2);
       particle('✦', { dx: -10, tone: 'gold' });
       particle('✦', { dx: 12, delay: 180, tone: 'gold' });
       particle(pick(['oof', '?!', 'mrow!']), { delay: 350, tone: 'dark' });
-      await sleep(rand(1300, 2000));
-      if (!alive) return;
+      await tween(rand(1400, 2000), (p) => { rot.t = 3.2 * Math.sin(p * Math.PI * 5) * (1 - p * 0.6); });
+      rot.t = 0;
       await jumpUp();
     }
 
-    // --- trips: hopping off the pill onto the page itself ---
-    const ROOM_ABOVE = 70;  // clear space she needs above an edge to stand on it
+    async function groom() {
+      pose('groom', 180);
+      kick(-0.5);
+      await tween(rand(1800, 2600), (p) => { rot.t = 1.3 * Math.sin((now / 1000) * Math.PI * 2 * 1.8) * Math.sin(p * Math.PI); });
+      rot.t = 0;
+      pose(idleFrame(), 220);
+      await W(220);
+    }
+
+    async function stretch() {
+      faceTo(pick([-1, 1]));
+      pose('stretch', 240);
+      sq.t = 0.97;
+      await W(1300);
+      sq.t = 1;
+      pose(idleFrame(), 260);
+      kick(0.8);
+      await W(260);
+    }
+
+    async function lieDown() {
+      pose('sleep', 480);
+      kick(-1.4);
+      await W(480);
+      sleepOn = true; sleepT0 = now; sleeping = true; nextZ = now + 600;
+    }
+
+    async function getUp() {
+      pose('stretch', 280);
+      sleeping = false;
+      kick(0.8);
+      await W(900);
+      pose(idleFrame(), 280);
+      await W(300);
+    }
+
+    async function hop() {
+      pose('sit-happy', 100);
+      particle('♥');
+      kick(-1.2);
+      await W(110);
+      setAir(true);
+      kick(1.6);
+      const y0 = y;
+      await tween(440, (p) => { y = y0 - 72 * p * (1 - p); });
+      y = y0;
+      setAir(false);
+      kick(-2.2);
+      await W(520);
+      pose(idleFrame(), 200);
+    }
+
+    async function purr() {
+      pose('purr', 160);
+      particle('prrr');
+      await tween(1600, (p) => { rot.t = 2.5 * Math.sin(p * Math.PI * 4.4) * Math.sin(p * Math.PI); });
+      rot.t = 0;
+      await W(250);
+      pose(idleFrame(), 220);
+    }
+
+    async function mew() {
+      pose('mew', 90);
+      kick(1.4);
+      particle(pick(['mew!', 'nya', 'mrrp']));
+      await W(1000);
+      pose(idleFrame(), 180);
+    }
+
+    async function flip() {
+      clicks = [];
+      pose('crouch', 100);
+      kick(-2);
+      await W(160);
+      pose('jump', 60);
+      setAir(true);
+      ['♥', '♥', '♥'].forEach((h, i) => particle(h, { dx: (i - 1) * 20, delay: i * 120 }));
+      particle('nya~!', { delay: 300 });
+      const y0 = y;
+      await tween(780, (p) => {
+        y = y0 - 168 * p * (1 - p);
+        rot.x = rot.t = -dir * 360 * ease(p);
+        rot.v = 0;
+      });
+      rot.x = rot.t = 0;
+      y = y0;
+      setAir(false);
+      pose('sit-happy', 80);
+      kick(-3);
+      await W(800);
+      pose(idleFrame(), 220);
+    }
+
+    async function peek() {
+      sleepOn = false;
+      pose('stretch', 260);
+      particle(pick(['5 more min…', 'mrrp?', '…!']), { tone: 'dark' });
+      await W(1500);
+      pose('sleep', 380);
+      await W(380);
+      sleepOn = true; sleepT0 = now;
+    }
+
+    // ---- trips: hopping off the pill onto the page itself ----
+    const ROOM_ABOVE = 70; // clear space she needs above an edge to stand on it
     let explore = true;
     let dragging = false;
-    let trip = null;        // { kind, el, broken }
-    let pendingTrip = null; // { run, at }
+    let trip = null;        // { kind, el, broken, watch, start }
+    let pendingTrip = null; // { kind, at }
     let nextIdleTrip = Date.now() + rand(60e3, 180e3);
 
-    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-    // The pet box's resting origin, in viewport px: its left edge and the pill-top line it stands on.
-    // (The pet sits inside the pill's 1px border, 4px below its top edge.)
+    // The pet box's resting origin in viewport px (it sits inside the pill's 1px border, 4px below its top).
     const origin = () => { const r = pill.getBoundingClientRect(); return { left: r.left + 1, line: r.top + 5 }; };
     // Where she stands on an element: its top edge, or the bottom edge for a header bar.
     const lineOf = (target, kind) => { const r = target.getBoundingClientRect(); return { r, y: kind === 'header' ? r.bottom : r.top }; };
@@ -311,95 +460,91 @@
     const canTrip = () => explore && !reduce && alive && !document.hidden && !dragging && mood !== 'sleep';
     const find = (kind) => AM.findPerch && AM.findPerch(kind, AM.siteId, BOX_W + 16);
 
-    // Wait up to `ms`, returning early (false) if `ok()` stops holding.
-    const hold = async (ms, ok) => {
-      const end = Date.now() + ms;
-      while (Date.now() < end) {
-        if (!ok()) return false;
-        await sleep(120);
-      }
-      return true;
+    // Break the current trip: cancel whatever she's doing (waits, walks, grooms) so she reacts at once.
+    const breakTrip = (reason) => {
+      if (!trip || trip.broken) return;
+      trip.broken = reason;
+      gen++;
     };
+    // Runs every frame while perched: if the spot scrolls, resizes, moves or disappears, she falls.
+    function checkPerch(t) {
+      const target = t.el;
+      if (!target.isConnected || (AM.isVisible && !AM.isVisible(target))) return breakTrip('gone');
+      const cur = lineOf(target, t.kind);
+      const s = t.start;
+      if (Math.abs(cur.y - s.y) > 2 || Math.abs(cur.r.left - s.r.left) > 2 || Math.abs(cur.r.width - s.r.width) > 2) breakTrip('moved');
+    }
 
-    // Crouch, arc-jump to (tx, ty) in pill-relative px, land.
+    // Crouch and arc-jump to (tx, ty) in pill-relative px.
     async function leap(tx, ty) {
-      const dx = tx - x;
-      faceTo(dx || dir);
-      show('crouch');
-      await sleep(260);
-      show('jump');
-      air(true);
-      const dist = Math.hypot(dx, ty - y);
-      const apex = Math.min(y, ty) - 30 - Math.min(70, dist * 0.12);
-      const ok = await move([
-        { transform: T(x, y) },
-        { transform: T((x + tx) / 2, apex), offset: 0.5 },
-        { transform: T(tx, ty) },
-      ], { duration: Math.min(1200, 540 + dist * 0.8), easing: 'cubic-bezier(.3,.6,.4,1)' });
-      air(false);
-      if (!ok) return false;
-      x = tx;
-      y = ty;
-      place();
-      show('crouch');
-      await squash();
-      idle();
-      return true;
+      walkOn = false; walking = false;
+      faceTo(tx - x || dir);
+      rot.t = 0;
+      pose('crouch', 140);
+      kick(-1.8);
+      await W(300);
+      pose('jump', 80);
+      kick(2.2);
+      setAir(true);
+      const x0 = x, y0 = y;
+      const dist = Math.hypot(tx - x0, ty - y0);
+      const cx = (x0 + tx) / 2, cy = Math.min(y0, ty) - 40 - Math.min(80, dist * 0.15);
+      await tween(Math.min(1100, 520 + dist * 0.7), (p) => {
+        const q = 1 - p;
+        x = q * q * x0 + 2 * q * p * cx + p * p * tx;
+        y = q * q * y0 + 2 * q * p * cy + p * p * ty;
+        const vx = 2 * q * (cx - x0) + 2 * p * (tx - cx);
+        const vy = 2 * q * (cy - y0) + 2 * p * (ty - cy);
+        rot.t = clamp(Math.atan2(vy, Math.abs(vx) + 1) * 57.3 * 0.25, -16, 16) * dir;
+        sq.t = 1 + clamp(Math.abs(vy) / 1800, 0, 0.1);
+        if (p > 0.8 && over !== 'crouch' && base !== 'crouch') pose('crouch', 110);
+      });
+      x = tx; y = ty;
+      setAir(false);
+      rot.t = 0; sq.t = 1;
+      kick(-2.8);
+      await W(170);
+      pose(idleFrame(), 210);
+      await W(200);
     }
 
     // The perch gave way: tumble to the bottom of the window and sit there dazed.
     async function tumble() {
-      stopWalkCycle();
-      const floor = innerHeight - 4 - origin().line;
-      const ground = Math.max(y + 12, floor);
-      const d = ground - y;
-      show('fall');
+      walkOn = false; walking = false;
+      pose('fall', 90);
+      setAir(true);
       particle(pick(['oof', 'eep!', '!?']), { tone: 'dark' });
-      air(true);
-      await move([
-        { transform: T(x, y, 'rotate(0deg)') },
-        { transform: T(x + dir * 8, y + d * 0.3, `rotate(${dir * 22}deg)`), offset: 0.35 },
-        { transform: T(x + dir * 14, ground, `rotate(${dir * 6}deg)`) },
-      ], { duration: Math.min(1000, 380 + Math.sqrt(d) * 26), easing: 'cubic-bezier(.5,0,.9,.55)' });
-      air(false);
-      x += dir * 14;
-      y = ground;
-      place();
-      show('dazed');
-      await squash();
+      const gy = Math.max(y + 12, innerHeight - 4 - origin().line);
+      let vx = dir * 60, vy = -60;
+      const y0 = y;
+      await run((s) => {
+        vy += 1500 * s;
+        x += vx * s; y += vy * s;
+        rot.t = dir * (10 + Math.min(18, Math.max(0, y - y0) * 0.1));
+        sq.t = 1 + Math.min(0.1, Math.max(0, vy) / 3000);
+        if (y >= gy) { y = gy; return true; }
+        return false;
+      });
+      setAir(false);
+      rot.t = 0; sq.t = 1;
+      pose('dazed', 70);
+      kick(-3.2);
       particle('✦', { dx: -10, tone: 'gold' });
       particle('✦', { dx: 12, delay: 180, tone: 'gold' });
-      await sleep(rand(1100, 1700));
+      await tween(rand(1200, 1800), (p) => { rot.t = 3.2 * Math.sin(p * Math.PI * 5) * (1 - p * 0.6); });
+      rot.t = 0;
     }
 
-    // Keep checking the perch every frame; if it scrolls, resizes, moves or disappears, she falls.
-    function watchPerch(t) {
-      const target = t.el;
-      const start = lineOf(target, t.kind);
-      const check = () => {
-        if (trip !== t || t.broken || t.el !== target) return;
-        if (!target.isConnected || !(AM.isVisible ? AM.isVisible(target) : true)) t.broken = 'gone';
-        else {
-          const now = lineOf(target, t.kind);
-          if (Math.abs(now.y - start.y) > 2 || Math.abs(now.r.left - start.r.left) > 2 || Math.abs(now.r.width - start.r.width) > 2) t.broken = 'moved';
-        }
-        if (t.broken) interrupt();
-        else requestAnimationFrame(check);
-      };
-      requestAnimationFrame(check);
-    }
-
-    // Jump onto `target`, landing near where she is now, and start watching it.
-    async function perchOn(t, target) {
-      t.el = target;
-      const { r, y: line } = lineOf(target, t.kind);
+    // Jump onto t.el near where she is now, then start watching it.
+    async function perchOn(t) {
+      t.watch = false;
+      const { r, y: line } = lineOf(t.el, t.kind);
       const o = origin();
       const here = o.left + x + BOX_W / 2;
       const cx = clamp(here + rand(-70, 70), r.left + BOX_W / 2 + 8, r.right - BOX_W / 2 - 8);
-      if (!(await leap(cx - BOX_W / 2 - o.left, line - o.line))) return false;
-      if (t.broken) return false;
-      watchPerch(t);
-      return true;
+      await leap(cx - BOX_W / 2 - o.left, line - o.line);
+      t.start = lineOf(t.el, t.kind);
+      t.watch = true;
     }
 
     // Horizontal range she can walk on the current perch, in pill-relative px.
@@ -409,269 +554,230 @@
       return [r.left + 6 - o.left, r.right - BOX_W - 6 - o.left];
     };
 
-    async function runTrip(kind, target, stay) {
-      busy = true;
-      breathe(false);
-      el.classList.remove('lying');
-      const t = { kind, el: target, broken: null };
-      trip = t;
-      try {
-        if (!(await perchOn(t, target))) return;
-        await stay(t);
-        if (t.broken && t.broken !== 'recall') await tumble();
-      } finally {
-        trip = null;
-        if (t.broken === 'recall') {
-          const b = bounds();
-          x = clamp(x, b.min, b.max);
-          y = 0;
-          place();
-          idle();
-        } else if (alive) {
-          const b = bounds();
-          await leap(clamp(x, b.min, b.max), 0);
-        }
-        busy = false;
-        next(rand(2500, 5000));
-      }
-    }
-
-    // Run a trip now, or as soon as she's free (dropped if it's gone stale).
-    function requestTrip(run) {
-      if (!canTrip() || trip) return;
-      if (busy || reacting || inAir) pendingTrip = { run, at: Date.now() };
-      else run();
-    }
-    function runPending() {
-      const p = pendingTrip;
-      pendingTrip = null;
-      if (p && Date.now() - p.at < 12000 && canTrip() && !trip) setTimeout(p.run, 60);
-    }
-
     const stayIdle = async (t) => {
       const [lo, hi] = perchRange(t);
       await walkTo(clamp(x + rand(-90, 90), lo, hi));
-      const end = Date.now() + rand(5000, 20000);
-      while (!t.broken && Date.now() < end) {
+      const end = now + rand(5000, 20000);
+      while (now < end) {
         const r = Math.random();
-        if (r < 0.3) { show('groom'); await hold(rand(1500, 2500), () => !t.broken); idle(); }
+        if (r < 0.3) await groom();
         else if (r < 0.5) await walkTo(clamp(x + rand(-60, 60), lo, hi));
-        else if (r < 0.62) { show('mew'); particle(pick(['mew', 'nya'])); await hold(900, () => !t.broken); idle(); }
-        else { idle(); await hold(rand(1500, 3000), () => !t.broken); }
+        else if (r < 0.62) await mew();
+        else await W(rand(1500, 3000));
       }
     };
 
-    // Sit on the composer watching the reply; when it's done, greet the new message, then go home.
+    // Watch the reply from the composer; when it's done, greet the new message.
     const stayReply = async (t) => {
-      show(mood === 'happy' ? 'sit-happy' : 'sit-worried');
-      await hold(1400, () => !t.broken);
-      if (mood === 'happy') idle();
-      const t0 = Date.now();
+      pose(mood === 'happy' ? 'sit-happy' : 'sit-worried', 180);
+      await W(1400);
+      if (mood === 'happy') pose(idleFrame(), 220);
+      const t0 = now;
       let started = false;
-      while (!t.broken && Date.now() - t0 < 180e3) {
+      while (now - t0 < 180e3) {
         const replying = AM.isReplying ? AM.isReplying(AM.siteId) : false;
         if (replying) started = true;
-        if (!replying && (started || Date.now() - t0 > 8000)) {
-          await hold(1200, () => !t.broken);
+        if (!replying && (started || now - t0 > 8000)) {
+          await W(1200);
           if (!(AM.isReplying && AM.isReplying(AM.siteId))) break;
         }
-        await sleep(300);
+        await W(300);
       }
-      if (t.broken) return;
       const msg = find('lastMessage');
       if (msg && msg !== t.el && perchable(msg, 'lastMessage')) {
         t.kind = 'lastMessage';
-        if (!(await perchOn(t, msg))) return;
-        show('mew');
-        particle(pick(['mew!', 'nya~', 'ooh']));
-        await hold(1300, () => !t.broken);
-        idle();
-        await hold(900, () => !t.broken);
+        t.el = msg;
+        await perchOn(t);
+        await mew();
+        await W(900);
       } else {
-        show('sit-happy');
+        pose('sit-happy', 120);
         particle('♥');
-        await hold(900, () => !t.broken);
+        kick(1.2);
+        await W(900);
+        pose(idleFrame(), 200);
+        await W(200);
       }
     };
 
-    const stayAlarm = async (t) => {
-      show('sit-stressed');
+    const stayAlarm = async () => {
+      pose('sit-stressed', 150);
+      kick(1);
       particle('!', { tone: 'dark' });
-      await hold(700, () => !t.broken);
+      await W(700);
       particle('!!', { tone: 'dark' });
-      await hold(rand(2200, 3200), () => !t.broken);
+      await W(rand(2200, 3200));
     };
 
-    const tripTo = (kind, stay, targetKinds) => () => {
-      if (!canTrip() || trip || busy || reacting) return;
-      for (const k of targetKinds) {
-        const target = find(k);
-        if (perchable(target, k)) return runTrip(k === 'composer' ? 'composer' : k, target, stay);
+    const TRIPS = {
+      reply: { targets: () => ['composer'], stay: stayReply },
+      alarm: { targets: () => ['limitBanner', 'composer'], stay: stayAlarm },
+      idle: { targets: () => (Math.random() < 0.35 ? ['header', 'composer'] : ['composer', 'header']), stay: stayIdle },
+    };
+
+    async function tripFor(kind) {
+      const spec = TRIPS[kind];
+      let target = null, tk = null;
+      for (const k of spec.targets()) {
+        const el = find(k);
+        if (perchable(el, k)) { target = el; tk = k; break; }
       }
-    };
-    const replyTrip = tripTo('reply', stayReply, ['composer']);
-    const alarmTrip = tripTo('alarm', stayAlarm, ['limitBanner', 'composer']);
+      if (!target) return false;
+      const t = { kind: tk, el: target, broken: null, watch: false, start: null };
+      trip = t;
+      try {
+        await perchOn(t);
+        await spec.stay(t);
+      } catch (e) {
+        if (e !== CANCEL) console.error(e);
+      }
+      trip = null;
+      if (t.broken === 'recall') return true;  // setDragging already put her back on the pill
+      if (t.broken) await tumble();
+      const b = bounds();
+      await leap(clamp(x, b.min, b.max), 0);
+      return true;
+    }
 
-    const onSend = () => requestTrip(replyTrip);
-    const onLimit = () => requestTrip(alarmTrip);
+    // Ask for a trip; the brain starts it as soon as she's free (stale requests are dropped).
+    const requestTrip = (kind) => {
+      if (!canTrip() || trip) return;
+      pendingTrip = { kind, at: Date.now() };
+      poke(0);
+    };
+    const onSend = () => requestTrip('reply');
+    const onLimit = () => requestTrip('alarm');
     if (AM.bus) {
       AM.bus.addEventListener('send', onSend);
       AM.bus.addEventListener('limit', onLimit);
     }
 
-    async function tick() {
-      if (!alive) return;
-      if (document.hidden || busy || reacting) return next(2000);
-      if (pendingTrip) return runPending();
-      // Idle explorer: at most one trip every 1-3 minutes, only from the pill, never mid-typing.
-      if (canTrip() && y === 0 && Date.now() > nextIdleTrip && !(AM.recentlyTyped && AM.recentlyTyped(6000))) {
-        nextIdleTrip = Date.now() + rand(60e3, 180e3);
-        const kinds = Math.random() < 0.35 ? ['header', 'composer'] : ['composer', 'header'];
-        for (const k of kinds) {
-          const target = find(k);
-          if (perchable(target, k)) return runTrip(k, target, stayIdle);
-        }
+    async function behave() {
+      if (mood === 'sleep') {
+        if (y > 0) await jumpUp();
+        if (!sleeping) await lieDown();
+        return 6000;
       }
-      busy = true;
-      try {
-        if (mood === 'sleep') {
-          if (y > 0) await jumpUp();
-          el.classList.add('lying');
-          show('sleep');
-          breathe(true);
-          return;
+      if (sleeping) await getUp();
+      const b = bounds();
+      if (reduce) { x = b.max; y = 0; pose(idleFrame(), 0); return 4000; }
+      if (y > 0) { await jumpUp(); return rand(1600, 3000); }
+      if (y < 0) { await leap(clamp(x, b.min, b.max), 0); return rand(1600, 3000); } // left stranded above the pill
+      if (pendingTrip) {
+        const p = pendingTrip;
+        pendingTrip = null;
+        if (Date.now() - p.at < 12000 && canTrip() && (await tripFor(p.kind))) return rand(2500, 5000);
+      }
+      // Idle explorer: at most one trip every 1-3 minutes, never mid-typing.
+      if (canTrip() && Date.now() > nextIdleTrip && !(AM.recentlyTyped && AM.recentlyTyped(6000))) {
+        nextIdleTrip = Date.now() + rand(60e3, 180e3);
+        if (await tripFor('idle')) return rand(2500, 5000);
+      }
+      if (x > b.max) { await walkTo(b.max); return 1500; }
+      const r = Math.random();
+      const side = Math.random() < 0.5 ? -1 : 1;
+      if (r < 0.14 && roomFor(side)) await fall(side);
+      else if (r < 0.58) await walkTo(rand(b.min, b.max));
+      else if (r < 0.76) await groom();
+      else if (r < 0.84) await stretch();
+      return rand(2200, 5600);
+    }
+
+    const cleanup = () => {
+      walkOn = false; walking = false; vel = 0; gaitAmp = 0;
+      rot.t = 0; sq.t = 1;
+      if (!inAir) pivT = 0;
+    };
+
+    async function brain() {
+      while (alive) {
+        await run(() => now >= brainWake, true);
+        if (!alive) return;
+        if (reacting || busy) { brainWake = now + 1500; continue; }
+        busy = true;
+        try { brainWake = now + (await behave()); } catch (e) {
+          if (e !== CANCEL) console.error(e);
+          brainWake = now + 1600;
+        } finally { busy = false; }
+      }
+    }
+    const poke = (ms) => { brainWake = Math.min(brainWake, now + ms); };
+
+    async function blinker() {
+      while (alive) {
+        await task(rand(2600, 6000), null, true);
+        if (busy || reacting || shown() !== 'sit' || over || walkOn) continue;
+        pose('sit-blink', 50);
+        await task(100, null, true);
+        if (shown() === 'sit-blink') pose('sit', 80);
+        if (Math.random() < 0.25) {
+          await task(220, null, true);
+          if (shown() !== 'sit' || busy || reacting) continue;
+          pose('sit-blink', 45);
+          await task(90, null, true);
+          if (shown() === 'sit-blink') pose('sit', 80);
         }
-        breathe(false);
-        el.classList.remove('lying');
-        const b = bounds();
-        if (reduce) {
-          x = b.max;
-          y = 0;
-          place();
-          idle();
-          return;
-        }
-        if (y > 0) return await jumpUp();
-        if (x > b.max) return await walkTo(b.max);
-        const r = Math.random();
-        const side = Math.random() < 0.5 ? -1 : 1;
-        if (r < 0.14 && roomFor(side)) await fall(side);
-        else if (r < 0.58) await walkTo(rand(b.min, b.max));
-        else if (r < 0.76) { show('groom'); await sleep(rand(1600, 2600)); idle(); }
-        else if (r < 0.84) { faceTo(pick([-1, 1])); show('stretch'); await sleep(1300); idle(); }
-        else idle();
-      } finally {
-        busy = false;
-        if (pendingTrip) runPending();
-        else next(mood === 'sleep' ? 6000 : rand(2200, 5600));
       }
     }
 
-    function next(ms) {
-      clearTimeout(timer);
-      if (alive) timer = setTimeout(tick, ms);
+    // Runs `fn` as the foreground action, cancelling whatever she was doing.
+    async function act(fn) {
+      const g = ++gen;
+      cleanup();
+      reacting = true;
+      try { await fn(); } catch (e) { if (e !== CANCEL) console.error(e); } finally {
+        if (g === gen) { reacting = false; poke(1600); }
+      }
     }
 
     async function react() {
-      const now = Date.now();
-      clicks = clicks.filter((t) => now - t < 4000).concat(now);
+      const t = Date.now();
+      clicks = clicks.filter((c) => t - c < 4000).concat(t);
       if (inAir) return particle('♥');
+      // On a trip, a click is a quick bounce and a heart, not something that ends the trip.
+      if (trip) { particle('♥'); kick(1.4); return; }
       const burst = clicks.length >= 8 && mood !== 'sleep';
       if (reacting && !burst) return;
-      interrupt();
-      reacting = true;
-      try {
-        if (mood === 'sleep') {
-          breathe(false);
-          show('stretch');
-          particle(pick(['5 more min…', 'mrrp?', '…!']), { tone: 'dark' });
-          await sleep(1500);
-          show('sleep');
-          breathe(true);
-        } else if (burst) {
-          clicks = [];
-          show('jump');
-          ['♥', '♥', '♥'].forEach((h, i) => particle(h, { dx: (i - 1) * 20, delay: i * 120 }));
-          particle('nya~!', { delay: 300 });
-          air(true);
-          await move([
-            { transform: T(x, y, 'rotate(0deg)') },
-            { transform: T(x, y - 40, 'rotate(-180deg)'), offset: 0.5 },
-            { transform: T(x, y, 'rotate(-360deg)') },
-          ], { duration: 820, easing: 'ease-in-out' });
-          air(false);
-          place();
-          show('sit-happy');
-          await squash();
-          await sleep(700);
-          idle();
-        } else {
-          const kind = pick(['hop', 'purr', 'mew', 'hop']);
-          if (kind === 'hop') {
-            show('sit-happy');
-            particle('♥');
-            air(true);
-            await move([{ transform: T(x, y) }, { transform: T(x, y - 18), offset: 0.45 }, { transform: T(x, y) }], { duration: 520, easing: 'ease-out' });
-            air(false);
-            place();
-            await squash();
-            await sleep(500);
-          } else if (kind === 'purr') {
-            show('purr');
-            particle('prrr');
-            await wobble(2.5, 5, 150);
-            await sleep(400);
-          } else {
-            show('mew');
-            particle(pick(['mew!', 'nya', 'mrrp']));
-            await sleep(1100);
-          }
-          idle();
-        }
-      } finally {
-        reacting = false;
-        if (pendingTrip && !trip) runPending();
-        else next(1600);
-      }
+      await act(burst ? flip : sleeping ? peek : pick([hop, purr, mew, hop]));
     }
 
-    place();
-    idle();
-    scheduleBlink();
-    next(900);
+    pose(idleFrame(), 0);
+    render();
+    raf = requestAnimationFrame(loop);
+    brain();
+    blinker();
+
+    const ACTIONS = { walk: () => { const b = bounds(); return walkTo(x > (b.min + b.max) / 2 ? b.min : b.max); },
+      fall: () => fall(roomFor(1) ? 1 : -1), groom, stretch, hop, purr, mew, flip };
 
     return {
       el,
       react,
+      play(name) { if (!inAir && ACTIONS[name] && mood !== 'sleep') act(ACTIONS[name]); },
       setMood(m) {
         if (m === mood) return;
         const prev = mood;
         mood = m;
-        // Crossing into 90%+: raise the alarm once.
-        if (m === 'stressed' && prev !== 'stressed' && prev !== 'sleep') setTimeout(() => requestTrip(alarmTrip), 400);
-        if (m !== 'sleep') {
-          el.classList.remove('lying');
-          breathe(false);
-        }
-        if (!busy && !reacting && !inAir && !walkTimer) idle();
-        if (!busy && !reacting) next(200);
+        // Crossing into 90%+ raises the alarm once.
+        if (m === 'stressed' && prev !== 'stressed' && prev !== 'sleep') requestTrip('alarm');
+        if (m !== 'sleep' && !busy && !reacting && !inAir && !walking && !sleeping) pose(idleFrame(), 300);
+        if (m !== 'sleep' && sleeping && !busy && !reacting) { gen++; }
+        poke(200);
       },
-      // Called after the pill's width changes, so she isn't left floating past the end.
-      nudge() {
-        if (!busy && !reacting && !inAir && y === 0 && x > bounds().max) next(100);
-      },
+      nudge() { if (!busy && !reacting && !inAir && y === 0 && x > bounds().max) poke(100); },
       setExplore(on) { explore = !!on; },
-      // The pill is being dragged: no new trips, and an ongoing one snaps her back onto it.
+      // The pill is being dragged: no new trips, and an ongoing one snaps her straight back onto it.
       setDragging(on) {
         dragging = !!on;
         if (on && trip) {
-          trip.broken = 'recall';
-          interrupt();
+          breakTrip('recall');
           const b = bounds();
           x = clamp(x, b.min, b.max);
           y = 0;
-          place();
-          idle();
+          setAir(false);
+          walkOn = false; walking = false; vel = 0;
+          rot.t = 0; sq.t = 1;
+          pose(idleFrame(), 0);
         }
       },
       get tripping() { return !!trip; },
@@ -681,13 +787,13 @@
           AM.bus.removeEventListener('send', onSend);
           AM.bus.removeEventListener('limit', onLimit);
         }
-        clearTimeout(timer);
-        clearTimeout(blinkTimer);
-        stopWalkCycle();
-        breathe(false);
-        if (anim) anim.cancel();
+        cancelAnimationFrame(raf);
+        tasks.clear();
         el.remove();
       },
     };
   };
+
+  AM.createPet = AM.createPetSmooth;
+  AM.PET_CSS = CSS;
 })();

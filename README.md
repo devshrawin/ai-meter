@@ -53,7 +53,16 @@ She pauses in hidden tabs and sits still if you have reduced motion turned on.
 
 She only stands on top edges. Only her visible sprite takes clicks, so the page stays usable, and dragging the pill calls her home. Where she can stand on each site is in `src/core/perches.js`: selectors verified live on 2026-09-28 (signed out) for ChatGPT, Gemini, Grok, Perplexity, Kimi, Qwen and Meta AI. Other sites use a generic finder that looks for the lowest text box and its styled container.
 
-She's drawn from 20 sprite frames in `src/assets/iris/`, cut from the reference sheets in `art/source/` by
+**Animation engine** (`src/core/pet.js`, rebuilt with Claude Design): one `requestAnimationFrame` clock drives everything.
+- **Walking:** an 8-frame walk cycle (`walk8-*`, registered by `src/core/walk8-frames.js`) advances by distance travelled, so her feet don't skate.
+- **Springs** give squash, stretch and tilt on every pose change, take-off and landing.
+- **Turns** between front and side views read as a quick squeeze instead of a snap.
+- **Jumps and falls** follow real arcs.
+- **Idle:** she breathes, trembles when stressed, and sways when dizzy.
+
+Debug knobs: `AIMeter.irisGait = 'walk8' | 'hop' | 'frames'`, `AIMeter.irisTimeScale` (slow motion).
+
+The other poses are 20 sprite frames in `src/assets/iris/`, cut from the reference sheets in `art/source/` by
 
 ```bash
 python scripts/build-sprites.py   # needs Pillow + numpy
