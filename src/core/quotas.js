@@ -26,6 +26,7 @@
     'src/core/parsers.js',
     'src/core/store.js',
     'src/core/banner.js',
+    'src/core/pet.js',
     'src/core/widget.js',
     'src/core/chatdom.js',
     'src/adapters/claude.js',
