@@ -31,6 +31,10 @@
     .pet .fx.dark { color: #6b6680; }
     .pet .fx.gold { color: #e8b93c; }
     .pet .fx.z { color: #9a9ab0; font-size: 11px; }
+    /* Yarn ball: lives on the pill next to her (not inside .pet, so it rolls independently). */
+    .yarn { position: absolute; left: 0; bottom: calc(100% - 3px); width: 16px; height: 16px; margin-left: -8px;
+      pointer-events: none; z-index: 2; will-change: transform, opacity; display: none; }
+    .yarn svg { width: 100%; height: 100%; display: block; overflow: visible; filter: drop-shadow(0 1.5px 1.5px rgba(60, 40, 110, .28)); }
   `;
 
   const rand = (a, b) => a + Math.random() * (b - a);
@@ -56,6 +60,47 @@
     const rig = document.createElement('div');
     rig.className = 'rig';
     el.append(shadow, rig);
+
+    // ---- yarn ball ----
+    const yarn = { el: document.createElement('div'), on: false, air: false, gone: false, x: 0, y: 0, vx: 0, vy: 0, spin: 0, pop: 1 };
+    yarn.el.className = 'yarn';
+    yarn.el.innerHTML = `<svg viewBox="0 0 16 16" aria-hidden="true">
+      <circle cx="8" cy="8" r="7" fill="#c7b3f2"/>
+      <circle cx="8" cy="8" r="7" fill="none" stroke="#a88ce6" stroke-width=".8"/>
+      <path d="M2.4 5.6 C6 4 10 4.2 13.6 6.4 M1.6 8.6 C5.6 6.6 10.6 7 14.4 9.4 M2.6 11.6 C6 10 10 10.2 13.4 12
+               M5.2 1.8 C3.6 6 4 10.6 6.2 14.6 M9.4 1.4 C7.6 5.8 8 10.4 10.4 14.4" fill="none" stroke="#9b7ddc" stroke-width=".7" stroke-linecap="round" opacity=".85"/>
+      <path d="M13.8 10.6 q2.8 1.6 1.6 4.6" fill="none" stroke="#a88ce6" stroke-width=".8" stroke-linecap="round"/>
+      <ellipse cx="5.6" cy="4.8" rx="2.2" ry="1.2" fill="#fff" opacity=".35"/>
+    </svg>`;
+    pill.append(yarn.el);
+    const YARN_R = 7;
+    const YARN_FRICTION = 55; // px/s² rolling slowdown on the pill
+    const showYarn = (bx) => {
+      Object.assign(yarn, { on: true, air: false, gone: false, x: bx, y: 0, vx: 0, vy: 0, pop: 0.2 });
+      yarn.el.style.display = 'block';
+      yarn.el.style.opacity = '1';
+    };
+    const hideYarn = () => { yarn.on = false; yarn.el.style.display = 'none'; };
+    // Rolls with friction along the pill top; past either end it falls off under gravity.
+    function stepYarn(s) {
+      yarn.pop += (1 - yarn.pop) * Math.min(1, s * 10);
+      const pw = pill.offsetWidth;
+      if (!yarn.air) {
+        if (yarn.vx) {
+          const sgn = Math.sign(yarn.vx);
+          yarn.vx -= sgn * YARN_FRICTION * s;
+          if (Math.sign(yarn.vx) !== sgn) yarn.vx = 0;
+        }
+        yarn.x += yarn.vx * s;
+        if (yarn.x < -YARN_R * 0.3 || yarn.x > pw + YARN_R * 0.3) { yarn.air = true; yarn.vy = -30; }
+      } else {
+        yarn.vy += 1400 * s;
+        yarn.x += yarn.vx * s;
+        yarn.y += yarn.vy * s;
+        if (pill.getBoundingClientRect().top + yarn.y > innerHeight + 30) { yarn.gone = true; hideYarn(); }
+      }
+      yarn.spin += (yarn.vx * s / YARN_R) * 57.3;
+    }
 
     const imgs = {};
     for (const [name, f] of Object.entries(frames)) {
@@ -183,6 +228,7 @@
       const breathe = !reduce && !inAir && !walkOn && (REST.has(cur) || sleepOn) ? (sleepOn ? 1.3 : 1) : 0;
       breathAmp += (breathe - breathAmp) * Math.min(1, s * 4);
       shadowA += ((inAir ? 0 : 1) - shadowA) * Math.min(1, s * 14);
+      if (yarn.on) stepYarn(s);
       if (sleepOn && now > nextZ) {
         particle('z', { tone: 'z', x0: 16, y0: 14, dx: 10, rise: 26, dur: 2200 });
         nextZ = now + 1500;
@@ -200,6 +246,7 @@
       rig.style.transform = `translate3d(${jx.toFixed(2)}px, ${bob.toFixed(2)}px, 0) translateY(${-piv}px) rotate(${rot.x.toFixed(2)}deg) translateY(${piv}px) scale(${sx.toFixed(4)}, ${sy.toFixed(4)})`;
       shadow.style.opacity = shadowA.toFixed(3);
       shadow.style.transform = `scale(${(0.5 + 0.5 * shadowA) * sx}, 1)`;
+      if (yarn.on) yarn.el.style.transform = `translate3d(${yarn.x.toFixed(2)}px, ${yarn.y.toFixed(2)}px, 0) rotate(${yarn.spin.toFixed(1)}deg) scale(${yarn.pop.toFixed(3)})`;
       const f = fl.x;
       for (const n in imgs) {
         const img = imgs[n];
@@ -239,7 +286,7 @@
       const d = Math.sign(tx - x);
       if (!walking) await startWalk(d);
       else if (d !== dir) { faceTo(d); kick(-0.5); }
-      const vmax = mood === 'stressed' ? 52 : 28;
+      const vmax = mood === 'stressed' ? 52 : lively ? 28 : 22;
       const acc = vmax / 0.3;
       const hopping = gait() === 'hop';
       const eight = gait() === 'walk8';
@@ -446,7 +493,10 @@
     let dragging = false;
     let trip = null;        // { kind, el, broken, watch, start }
     let pendingTrip = null; // { kind, at }
-    let nextIdleTrip = Date.now() + rand(60e3, 180e3);
+    // Calm (default) keeps her mostly sitting; lively is the old, busier pace.
+    let lively = false;
+    const idleTripGap = () => (lively ? rand(60e3, 180e3) : rand(240e3, 480e3));
+    let nextIdleTrip = Date.now() + idleTripGap();
 
     // The pet box's resting origin in viewport px (it sits inside the pill's 1px border, 4px below its top).
     const origin = () => { const r = pill.getBoundingClientRect(); return { left: r.left + 1, line: r.top + 5 }; };
@@ -668,25 +718,81 @@
         pendingTrip = null;
         if (Date.now() - p.at < 12000 && canTrip() && (await tripFor(p.kind))) return rand(2500, 5000);
       }
-      // Idle explorer: at most one trip every 1-3 minutes, never mid-typing.
+      // Idle explorer: at most one trip every 4-8 minutes (1-3 when lively), never mid-typing.
       if (canTrip() && Date.now() > nextIdleTrip && !(AM.recentlyTyped && AM.recentlyTyped(6000))) {
-        nextIdleTrip = Date.now() + rand(60e3, 180e3);
+        nextIdleTrip = Date.now() + idleTripGap();
         if (await tripFor('idle')) return rand(2500, 5000);
       }
       if (x > b.max) { await walkTo(b.max); return 1500; }
       const r = Math.random();
       const side = Math.random() < 0.5 ? -1 : 1;
-      if (r < 0.14 && roomFor(side)) await fall(side);
-      else if (r < 0.58) await walkTo(rand(b.min, b.max));
-      else if (r < 0.76) await groom();
-      else if (r < 0.84) await stretch();
-      return rand(2200, 5600);
+      if (lively) {
+        if (r < 0.12 && roomFor(side)) await fall(side);
+        else if (r < 0.5) await walkTo(rand(b.min, b.max));
+        else if (r < 0.66) await groom();
+        else if (r < 0.74) await stretch();
+        else if (r < 0.86) await playYarn();
+        return rand(2200, 5600);
+      }
+      // Calm: about half the time she just sits there; short strolls, rare tumbles.
+      if (r < 0.03 && roomFor(side)) await fall(side);
+      else if (r < 0.22) await walkTo(clamp(x + side * rand(30, 90), b.min, b.max));
+      else if (r < 0.33) await groom();
+      else if (r < 0.38) await stretch();
+      else if (r < 0.46) await playYarn();
+      return rand(7000, 15000);
+    }
+
+    // Bat a yarn ball along the pill a few times, then knock it off the edge and watch it go.
+    async function playYarn() {
+      const b = bounds();
+      const pw = b.w;
+      const me = () => x + BOX_W / 2;
+      const d0 = me() < pw / 2 ? 1 : -1;
+      showYarn(clamp(me() + d0 * 36, 14, pw - 14));
+      faceTo(d0);
+      particle('!', { tone: 'dark' });
+      kick(1);
+      await W(600);
+      for (let i = 0; i < 4; i++) {
+        const d = yarn.x >= me() ? 1 : -1;
+        // stand with her front paws just behind the ball
+        await walkTo(clamp(yarn.x - BOX_W / 2 - d * 20, -BOX_W * 0.4, pw - BOX_W * 0.6), false);
+        walkOn = false; walking = false;
+        faceTo(d);
+        pose('crouch', 110);
+        kick(-1.4);
+        await W(280);
+        pose('sit-happy', 90);
+        kick(1.8);
+        const last = i === 3 || (i > 0 && Math.random() < 0.4);
+        const toEdge = d > 0 ? pw + YARN_R - yarn.x : yarn.x + YARN_R;
+        yarn.vx = d * (last ? Math.sqrt(2 * YARN_FRICTION * toEdge) + 30 : rand(30, 60));
+        particle(last ? pick(['oops~', 'hehe', 'bye ball!']) : pick(['*bap*', '*pat*', 'mrrp']));
+        await run(() => yarn.vx === 0 || yarn.air || yarn.gone);
+        if (yarn.air || yarn.gone) break;
+        pose(idleFrame(), 160);
+        await W(rand(350, 800));
+      }
+      if (yarn.air || yarn.gone) {
+        faceTo(Math.sign(yarn.x - me()) || dir);
+        pose('teeter', 140);
+        particle('!', { tone: 'dark' });
+        await run(() => yarn.gone);
+        pose('sit-happy', 180);
+        particle(pick(['mrrp', 'nya~', '♥']));
+        await W(900);
+      }
+      hideYarn();
+      pose(idleFrame(), 220);
+      await W(250);
     }
 
     const cleanup = () => {
       walkOn = false; walking = false; vel = 0; gaitAmp = 0;
       rot.t = 0; sq.t = 1;
       if (!inAir) pivT = 0;
+      if (yarn.on && !yarn.air) hideYarn(); // interrupted mid-play: tidy the ball away
     };
 
     async function brain() {
@@ -748,7 +854,7 @@
     blinker();
 
     const ACTIONS = { walk: () => { const b = bounds(); return walkTo(x > (b.min + b.max) / 2 ? b.min : b.max); },
-      fall: () => fall(roomFor(1) ? 1 : -1), groom, stretch, hop, purr, mew, flip };
+      fall: () => fall(roomFor(1) ? 1 : -1), groom, stretch, hop, purr, mew, flip, yarn: playYarn };
 
     return {
       el,
@@ -766,6 +872,36 @@
       },
       nudge() { if (!busy && !reacting && !inAir && y === 0 && x > bounds().max) poke(100); },
       setExplore(on) { explore = !!on; },
+      setEnergy(level) {
+        const l = level === 'lively';
+        if (l === lively) return;
+        lively = l;
+        nextIdleTrip = Date.now() + idleTripGap();
+      },
+      // Sent home: say bye, walk off the end of the pill and fade out. Resolves when she's gone.
+      async leave() {
+        if (!alive) return;
+        gen++;
+        cleanup();
+        reacting = true;
+        trip = null;
+        pendingTrip = null;
+        explore = false;
+        try {
+          sleepOn = false; sleeping = false;
+          const b = bounds();
+          if (y !== 0) { x = clamp(x, b.min, b.max); y = 0; setAir(false); }
+          particle(pick(['bye!', 'see you~', 'nya~']));
+          if (!reduce) {
+            const side = x > (b.min + b.max) / 2 ? 1 : -1;
+            await walkTo(side > 0 ? b.w + 6 : -BOX_W - 6, false);
+          }
+          await tween(320, (p) => { el.style.opacity = String(1 - p); });
+        } catch (e) {
+          if (e !== CANCEL) console.error(e);
+        }
+        el.style.opacity = '0';
+      },
       // The pill is being dragged: no new trips, and an ongoing one snaps her straight back onto it.
       setDragging(on) {
         dragging = !!on;
@@ -790,6 +926,7 @@
         cancelAnimationFrame(raf);
         tasks.clear();
         el.remove();
+        yarn.el.remove();
       },
     };
   };

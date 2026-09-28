@@ -41,7 +41,9 @@ Estimate limits change often and differ by plan — set yours in **Settings → 
 Iris, a white Persian with odd eyes, lives on top of the meter. She sits, blinks, grooms and walks
 along the pill. Now and then she teeters off the edge, tumbles, sits dazed and leaps back up. Her
 mood follows your session limit: calm, then worried, then stressed, and asleep in a loaf at 100%.
-Click her for a reaction (eight quick clicks for a special one). You can turn her off in Settings.
+Click her for a reaction (eight quick clicks for a special one). Now and then she plays with a yarn ball, batting it along the pill until she knocks it off the edge.
+- **Energy** (Settings → Iris): *Calm* is the default. She mostly sits, with 7–15 s between actions, short strolls, rare tumbles and page wanders every 4–8 min. *Lively* is busier.
+- **Send Iris home:** a button in Settings, or the link at the bottom of the pill's panel. She says bye and walks off; "Bring Iris back" returns her.
 She pauses in hidden tabs and sits still if you have reduced motion turned on.
 
 **Trips** (Settings → "Let Iris explore the page", on by default): Iris leaves the pill for the page itself.

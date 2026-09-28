@@ -95,6 +95,7 @@
     widget: true,
     chatStats: true,
     pet: true,
+    irisEnergy: 'calm',
     explore: true,
     notify: true,
     thresholds: [75, 90, 100],

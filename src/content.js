@@ -142,6 +142,11 @@
       adapter = AM.adapterFor(host, settings);
       if (!adapter) return;
       AM.siteId = adapter.id;
+      // Lets the on-page panel change a setting (e.g. "Send Iris home"); onChanged below applies it.
+      AM.setSetting = async (key, value) => {
+        const { settings: stored } = await AM.storage.get('settings');
+        await AM.storage.set({ settings: { ...(stored || {}), [key]: value } });
+      };
       adapter.init(ctx);
       AM.banner.watch(ctx);
       pending.splice(0).forEach(handle);

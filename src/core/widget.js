@@ -59,6 +59,9 @@
     .kv { display: flex; justify-content: space-between; gap: 8px; margin: 3px 0; }
     .kv span:last-child { text-align: right; }
     .note { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .foot { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; }
+    .iris-toggle { font: inherit; font-size: 11px; color: var(--muted); background: none; border: 0; padding: 2px 4px; cursor: pointer; border-radius: 6px; }
+    .iris-toggle:hover { color: var(--fg); background: var(--track); }
   ` + AM.PET_CSS;
 
   let host = null;
@@ -93,9 +96,19 @@
   function setPet(on) {
     if (on === petOn && (!on || pet)) return;
     petOn = on;
-    wrap.classList.toggle('with-pet', on);
-    if (pet) pet.destroy();
-    pet = on ? AM.createPet(pill, host) : null;
+    const old = pet;
+    pet = null;
+    if (old) {
+      // Sent home: let her say bye and walk off first (bounded, in case the tab is hidden and frames stall).
+      const gone = !on && old.leave ? Promise.race([old.leave(), new Promise((r) => setTimeout(r, 4000))]) : Promise.resolve();
+      gone.finally(() => { old.destroy(); if (!petOn && wrap) wrap.classList.remove('with-pet'); });
+    } else if (!on) {
+      wrap.classList.remove('with-pet');
+    }
+    if (on) {
+      wrap.classList.add('with-pet');
+      pet = AM.createPet(pill, host);
+    }
   }
 
   function mount() {
@@ -215,6 +228,13 @@
       row.append(t, bar, sub);
       panel.append(row);
     }
+    if (AM.setSetting) {
+      const foot = el('div', 'foot');
+      const link = el('button', 'iris-toggle', petOn ? 'Send Iris home' : 'Bring Iris back');
+      link.addEventListener('click', () => AM.setSetting('pet', !petOn));
+      foot.append(link);
+      panel.append(foot);
+    }
     panelBox.append(panel);
   }
 
@@ -250,6 +270,7 @@
 
   AM.widget = {
     destroy: unmount,
+    get pet() { return pet; }, // for debugging from the console: AIMeter.widget.pet.play('yarn')
     update(name, meters, settings, chat) {
       if (AM.dead) return;
       last = { name, meters, chat: chat || null };
@@ -264,7 +285,10 @@
         document.body.appendChild(host);
       }
       setPet(settings.pet !== false);
-      if (pet) pet.setExplore(settings.explore !== false);
+      if (pet) {
+        pet.setExplore(settings.explore !== false);
+        if (pet.setEnergy) pet.setEnergy(settings.irisEnergy);
+      }
       render();
     },
   };

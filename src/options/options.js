@@ -82,8 +82,11 @@ function readQuotas() {
 function renderGeneral() {
   $('widget').checked = settings.widget;
   $('chatStats').checked = settings.chatStats;
-  $('pet').checked = settings.pet;
   $('explore').checked = settings.explore;
+  $('irisEnergy').value = settings.irisEnergy === 'lively' ? 'lively' : 'calm';
+  $('irisStatus').textContent = settings.pet ? 'Iris is on the meter.' : 'Iris is at home.';
+  $('irisHome').textContent = settings.pet ? 'Send Iris home' : 'Bring Iris back';
+  $('irisOpts').classList.toggle('off', !settings.pet);
   $('notify').checked = settings.notify;
   $('debug').checked = settings.debug;
   $('thresholds').value = settings.thresholds.join(', ');
@@ -108,8 +111,8 @@ async function save() {
       ...settings,
       widget: $('widget').checked,
       chatStats: $('chatStats').checked,
-      pet: $('pet').checked,
       explore: $('explore').checked,
+      irisEnergy: $('irisEnergy').value,
       notify: $('notify').checked,
       debug: $('debug').checked,
       thresholds: thresholds.length ? thresholds : AM.DEFAULT_SETTINGS.thresholds,
@@ -184,6 +187,15 @@ async function removeSite(host) {
 }
 
 $('addSite').addEventListener('click', addSite);
+// Iris settings take effect straight away, no Save needed.
+$('irisHome').addEventListener('click', async () => {
+  settings = { ...settings, pet: !settings.pet };
+  await chrome.storage.local.set({ settings });
+  renderGeneral();
+  flash(settings.pet ? 'Iris is back on the meter.' : 'Iris went home. Bring her back any time.');
+});
+$('irisEnergy').addEventListener('change', save);
+$('explore').addEventListener('change', save);
 $('defaults').addEventListener('click', async () => {
   settings = { ...AM.mergeSettings(null), customSites: settings.customSites };
   await chrome.storage.local.set({ settings });
