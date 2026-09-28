@@ -229,6 +229,8 @@
       </g>
     </svg>`;
 
+  AM.PET_SVG = SVG;
+
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const rand = (a, b) => a + Math.random() * (b - a);
   const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
