@@ -103,6 +103,45 @@ test('Grok credits: raw (unframed) protobuf and grpc error trailer', () => {
   assert.match(AM.parseGrokCredits(bad, NOW).error, /grpc-status:16/);
 });
 
+test('claudeChatStats: current branch, skips thinking/tool results, cache window', () => {
+  const t0 = NOW - 20 * 60e3;
+  const conv = {
+    model: 'claude-opus-5-5',
+    current_leaf_message_uuid: 'a2',
+    chat_messages: [
+      { uuid: 'h1', parent_message_uuid: '00000000', sender: 'human', created_at: new Date(t0 - 60e3).toISOString(), content: [{ type: 'text', text: 'x'.repeat(1000) }], attachments: [{ extracted_content: 'y'.repeat(2000) }] },
+      { uuid: 'a1', parent_message_uuid: 'h1', sender: 'assistant', created_at: new Date(t0 - 30e3).toISOString(), content: [{ type: 'thinking', thinking: 'z'.repeat(9999) }, { type: 'text', text: 'x'.repeat(400) }] },
+      { uuid: 'bx', parent_message_uuid: 'h1', sender: 'assistant', created_at: new Date(t0).toISOString(), content: [{ type: 'text', text: 'abandoned branch'.repeat(500) }] },
+      { uuid: 'h2', parent_message_uuid: 'a1', sender: 'human', created_at: new Date(t0).toISOString(), content: [{ type: 'text', text: 'x'.repeat(200) }], files_v2: [{}] },
+      { uuid: 'a2', parent_message_uuid: 'h2', sender: 'assistant', created_at: new Date(t0 + 10e3).toISOString(), content: [{ type: 'tool_use', input: { q: 'hi' } }, { type: 'tool_result', content: [{ type: 'text', text: 'r'.repeat(5000) }] }, { type: 'text', text: 'x'.repeat(600) }] },
+    ],
+  };
+  const s = plain(AM.claudeChatStats(conv, NOW));
+  assert.equal(s.messages, 4);
+  const lastTok = Math.ceil((JSON.stringify({ q: 'hi' }).length + 600) * 0.35);
+  const expected = 3200 + Math.ceil(3000 * 0.35) + Math.ceil(400 * 0.35) + Math.ceil(200 * 0.35) + 1600 + lastTok;
+  assert.equal(s.tokens, expected);
+  assert.equal(s.cachedUntil, t0 + 10e3 + 3600e3);
+  assert.equal(s.nextCost, lastTok);
+  const later = plain(AM.claudeChatStats(conv, t0 + 2 * 3600e3));
+  assert.equal(later.nextCost, expected);
+});
+
+test('claudeChatStats: flat list without tree, empty chat, bad input', () => {
+  const flat = plain(AM.claudeChatStats({ chat_messages: [
+    { index: 1, sender: 'assistant', created_at: new Date(NOW).toISOString(), content: [{ type: 'text', text: 'b'.repeat(100) }] },
+    { index: 0, sender: 'human', created_at: new Date(NOW - 1e3).toISOString(), content: [{ type: 'text', text: 'a'.repeat(100) }] },
+  ] }, NOW));
+  assert.equal(flat.messages, 2);
+  assert.equal(flat.cachedUntil, NOW + 3600e3);
+  assert.equal(plain(AM.claudeChatStats({ chat_messages: [] }, NOW)).tokens, 3200);
+  assert.equal(AM.claudeChatStats(null), null);
+});
+
+test('fmtTokens', () => {
+  assert.deepEqual([950, 1000, 34620, 250000, 1234567].map(AM.fmtTokens), ['950', '1k', '34.6k', '250k', '1.23M']);
+});
+
 test('b64ToBytes round-trips', () => {
   assert.deepEqual([...AM.b64ToBytes(Buffer.from([0, 1, 250, 255]).toString('base64'))], [0, 1, 250, 255]);
 });

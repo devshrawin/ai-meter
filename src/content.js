@@ -21,6 +21,7 @@
   let settings = AM.mergeSettings(null);
   let adapter = null;
   let injectOk = false;
+  let chat = null;
   const reqSubs = [];
   const resSubs = [];
   const groups = {};
@@ -54,6 +55,10 @@
       groups[group] = meters || [];
       publish();
     },
+    setChat(stats) {
+      chat = stats;
+      publish();
+    },
     async getJSON(url, init) {
       const r = await fetch(url, { credentials: 'include', ...(init || {}) });
       if (!r.ok) throw new Error(`${r.status} ${url}`);
@@ -74,7 +79,7 @@
   function publish() {
     if (!adapter) return;
     const meters = current();
-    AM.widget.update(adapter.name, meters, settings);
+    AM.widget.update(adapter.name, meters, settings, settings.chatStats ? chat : null);
     send({ type: 'aimeter:usage', provider: adapter.id, name: adapter.name, meters });
   }
 

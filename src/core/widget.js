@@ -30,6 +30,12 @@
     .sub { display: flex; justify-content: space-between; margin-top: 3px; font-size: 11px; color: var(--muted); }
     .tag { font-size: 10px; padding: 1px 5px; border-radius: 4px; border: 1px solid var(--line); color: var(--muted); }
     .empty { color: var(--muted); }
+    .sep { width: 1px; height: 12px; background: var(--line); }
+    .cache.on { color: var(--low); } .cache.soon { color: var(--mid); } .cache.off { color: var(--muted); }
+    .chat { margin: 2px 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+    .chat-h { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+    .kv { display: flex; justify-content: space-between; gap: 8px; margin: 3px 0; }
+    .kv span:last-child { text-align: right; }
   `;
 
   let host = null;
@@ -98,6 +104,30 @@
     });
   }
 
+  function cacheState(chat, now) {
+    const left = chat.cachedUntil ? chat.cachedUntil - now : null;
+    if (left == null) return { cls: 'off', short: 'no cache', long: 'Not cached' };
+    if (left <= 0) return { cls: 'off', short: 'cache expired', long: 'Expired — next message re-reads the whole chat' };
+    const d = AM.formatDuration(left);
+    return { cls: left < 10 * 60e3 ? 'soon' : 'on', short: 'cached ' + d, long: `Cached for ${d}` };
+  }
+
+  function chatSection(chat, now) {
+    const box = el('div', 'chat');
+    box.append(el('div', 'chat-h', 'This chat'));
+    const c = cacheState(chat, now);
+    const line = (k, v, cls) => {
+      const r = el('div', 'kv');
+      r.append(el('span', 'muted', k), el('span', cls || null, v));
+      box.append(r);
+    };
+    line('Length', `≈ ${chat.tokens.toLocaleString()} tokens · ${chat.messages} msgs`);
+    line('Cache', c.long, 'cache ' + c.cls);
+    const cachedNow = c.cls !== 'off';
+    line('Next message', `≈ ${chat.nextCost.toLocaleString()} tokens${cachedNow ? ' (rest cached)' : ''}`);
+    return box;
+  }
+
   function render() {
     if (!root) return;
     const wrap = root.querySelector('.wrap');
@@ -114,6 +144,7 @@
       h.append(el('span', null, name), el('span', 'muted', 'AI Meter'));
       panel.append(h);
       if (!meters.length) panel.append(el('div', 'empty', 'No usage data yet. Send a message or open usage settings.'));
+      if (last.chat) panel.append(chatSection(last.chat, now));
       for (const m of meters) {
         const pct = AM.pctOf(m);
         const row = el('div', 'row');
@@ -141,13 +172,18 @@
       const rt = top.resetAt ? AM.formatDuration(top.resetAt - now) : '';
       if (rt) pill.append(el('span', 'muted', '· ' + rt));
     }
+    if (last.chat) {
+      const c = cacheState(last.chat, now);
+      pill.append(el('span', 'sep'), el('span', null, AM.fmtTokens(last.chat.tokens) + ' tok'));
+      pill.append(el('span', 'cache ' + c.cls, c.short));
+    }
     attachDrag(pill);
     wrap.append(pill);
   }
 
   AM.widget = {
-    update(name, meters, settings) {
-      last = { name, meters };
+    update(name, meters, settings, chat) {
+      last = { name, meters, chat: chat || null };
       if (!settings.widget) return unmount();
       if (!host) {
         if (!document.body) {

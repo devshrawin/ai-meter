@@ -88,6 +88,7 @@
 
   AM.DEFAULT_SETTINGS = {
     widget: true,
+    chatStats: true,
     notify: true,
     thresholds: [75, 90, 100],
     debug: false,

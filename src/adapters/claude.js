@@ -1,4 +1,5 @@
-// Claude: reads the same usage endpoint that powers Settings > Usage (real numbers).
+// Claude: reads the same usage endpoint that powers Settings > Usage (real numbers),
+// plus per-chat length / cache / next-message estimates from the open conversation.
 (() => {
   const AM = globalThis.AIMeter;
   const LABELS = {
@@ -36,6 +37,31 @@
       this.refresh();
       setInterval(() => ctx.visible() && this.refresh(), 60000);
       document.addEventListener('visibilitychange', () => ctx.visible() && this.refresh());
+      // claude.ai is a single-page app: watch for switching chats.
+      this.path = location.pathname;
+      setInterval(() => {
+        if (location.pathname !== this.path) {
+          this.path = location.pathname;
+          this.refreshChat();
+        }
+      }, 1000);
+    },
+
+    chatId() {
+      return (location.pathname.match(/\/chat\/([0-9a-f-]{36})/i) || [])[1] || null;
+    },
+
+    async refreshChat() {
+      const id = this.chatId();
+      if (!id) return this.ctx.setChat(null);
+      try {
+        const org = await this.orgId();
+        const conv = await this.ctx.getJSON(
+          `/api/organizations/${org}/chat_conversations/${id}?tree=True&rendering_mode=messages&render_all_tools=true`);
+        if (id === this.chatId()) this.ctx.setChat(AM.claudeChatStats(conv));
+      } catch (e) {
+        this.ctx.log('chat fetch failed:', e.message);
+      }
     },
 
     async orgId() {
@@ -50,6 +76,7 @@
     },
 
     async refresh() {
+      this.refreshChat();
       try {
         const org = await this.orgId();
         this.parse(await this.ctx.getJSON(`/api/organizations/${org}/usage`));

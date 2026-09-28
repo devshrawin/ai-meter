@@ -115,6 +115,68 @@
       });
   };
 
+  // --- Claude per-chat stats (estimates) ---
+  // Claude's tokenizer yields ~1.4x the tokens of GPT's o200k (~4 chars/token), so ~0.35 tokens/char.
+  const TOKENS_PER_CHAR = 0.35;
+  const SYSTEM_TOKENS = 3200;
+  const FILE_TOKENS = 1600;
+  AM.CLAUDE_CACHE_MS = 3600e3;
+
+  AM.estimateTokens = (text) => Math.ceil(String(text || '').length * TOKENS_PER_CHAR);
+
+  // Thinking and tool results aren't re-sent on later turns, so they don't count toward length.
+  const blockText = (b) => {
+    if (!b || typeof b !== 'object') return '';
+    if (b.type === 'thinking' || b.type === 'redacted_thinking' || b.type === 'tool_result') return '';
+    let s = typeof b.text === 'string' ? b.text : '';
+    if (b.input) s += JSON.stringify(b.input);
+    if (Array.isArray(b.content)) s += b.content.map(blockText).join('');
+    return s;
+  };
+
+  const messageTokens = (m) => {
+    let text = Array.isArray(m.content) ? m.content.map(blockText).join('') : (m.text || '');
+    for (const a of m.attachments || []) if (a && a.extracted_content) text += a.extracted_content;
+    const files = (m.files_v2 || m.files || []).length;
+    return AM.estimateTokens(text) + files * FILE_TOKENS;
+  };
+
+  // Current branch: walk back from the leaf when the tree is present, else take the list in order.
+  const currentBranch = (conv) => {
+    const all = Array.isArray(conv.chat_messages) ? conv.chat_messages : [];
+    const leaf = conv.current_leaf_message_uuid;
+    if (!leaf || !all.some((m) => m.parent_message_uuid)) {
+      return all.slice().sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+    }
+    const byId = new Map(all.map((m) => [m.uuid, m]));
+    const out = [];
+    for (let m = byId.get(leaf); m && out.length <= all.length; m = byId.get(m.parent_message_uuid)) out.unshift(m);
+    return out;
+  };
+
+  AM.claudeChatStats = (conv, now = Date.now()) => {
+    if (!conv || typeof conv !== 'object') return null;
+    const msgs = currentBranch(conv);
+    if (!msgs.length) return { tokens: SYSTEM_TOKENS, messages: 0, nextCost: SYSTEM_TOKENS, cachedUntil: null, model: conv.model || null };
+    const per = msgs.map(messageTokens);
+    const tokens = SYSTEM_TOKENS + per.reduce((a, b) => a + b, 0);
+    const last = msgs[msgs.length - 1];
+    const lastAt = Date.parse(last.created_at || last.updated_at || '') || null;
+    const cachedUntil = lastAt ? lastAt + AM.CLAUDE_CACHE_MS : null;
+    const cached = cachedUntil != null && cachedUntil > now;
+    // While cached, only the newest reply is re-read at full cost; after expiry the whole chat is.
+    const nextCost = cached ? per[per.length - 1] : tokens;
+    return { tokens, messages: msgs.length, lastAt, cachedUntil, nextCost, model: conv.model || null };
+  };
+
+  AM.fmtTokens = (n) => {
+    if (n == null || !isFinite(n)) return '';
+    if (n < 1000) return String(Math.round(n));
+    if (n < 100000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+    if (n < 1e6) return Math.round(n / 1000) + 'k';
+    return (n / 1e6).toFixed(2).replace(/0$/, '') + 'M';
+  };
+
   AM.b64ToBytes = (b64) => {
     const bin = atob(b64);
     const out = new Uint8Array(bin.length);
