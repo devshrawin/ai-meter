@@ -693,6 +693,11 @@
     const requestTrip = (kind) => {
       if (!canTrip() || trip) return;
       pendingTrip = { kind, at: Date.now() };
+      // A send or limit alarm is worth dropping an idle stroll/groom/yarn game for: go right away.
+      if (busy && !reacting && !inAir) {
+        cleanup();
+        gen++;
+      }
       poke(0);
     };
     const onSend = () => requestTrip('reply');
@@ -716,7 +721,7 @@
       if (pendingTrip) {
         const p = pendingTrip;
         pendingTrip = null;
-        if (Date.now() - p.at < 12000 && canTrip() && (await tripFor(p.kind))) return rand(2500, 5000);
+        if (Date.now() - p.at < 20000 && canTrip() && (await tripFor(p.kind))) return rand(2500, 5000);
       }
       // Idle explorer: at most one trip every 4-8 minutes (1-3 when lively), never mid-typing.
       if (canTrip() && Date.now() > nextIdleTrip && !(AM.recentlyTyped && AM.recentlyTyped(6000))) {
@@ -803,7 +808,7 @@
         busy = true;
         try { brainWake = now + (await behave()); } catch (e) {
           if (e !== CANCEL) console.error(e);
-          brainWake = now + 1600;
+          brainWake = now + (pendingTrip ? 0 : 1600);
         } finally { busy = false; }
       }
     }
@@ -827,12 +832,15 @@
     }
 
     // Runs `fn` as the foreground action, cancelling whatever she was doing.
+    // Its own counter (not `gen`), so a trip breaking mid-action can't leave `reacting` stuck on.
+    let actGen = 0;
     async function act(fn) {
-      const g = ++gen;
+      const a = ++actGen;
+      gen++;
       cleanup();
       reacting = true;
       try { await fn(); } catch (e) { if (e !== CANCEL) console.error(e); } finally {
-        if (g === gen) { reacting = false; poke(1600); }
+        if (a === actGen) { reacting = false; poke(1600); }
       }
     }
 
@@ -854,7 +862,8 @@
     blinker();
 
     const ACTIONS = { walk: () => { const b = bounds(); return walkTo(x > (b.min + b.max) / 2 ? b.min : b.max); },
-      fall: () => fall(roomFor(1) ? 1 : -1), groom, stretch, hop, purr, mew, flip, yarn: playYarn };
+      fall: () => fall(roomFor(1) ? 1 : -1), groom, stretch, hop, purr, mew, flip, yarn: playYarn,
+      trip: () => tripFor('idle'), reply: () => tripFor('reply') };
 
     return {
       el,
