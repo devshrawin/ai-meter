@@ -10,7 +10,7 @@
     .wrap { --bg: #ffffff; --fg: #1c1917; --muted: #78716c; --line: #e7e5e4; --track: #f0eeec;
       --low: #16a34a; --mid: #d97706; --high: #dc2626; --none: #a8a29e;
       display: flex; flex-direction: column; align-items: flex-end; gap: 6px; color: var(--fg); }
-    .wrap.with-pet { gap: 30px; padding-top: 22px; }
+    .wrap.with-pet { gap: 50px; padding-top: 42px; }
     @media (prefers-color-scheme: dark) {
       .wrap { --bg: #1c1b1a; --fg: #f5f5f4; --muted: #a8a29e; --line: #3a3836; --track: #2e2c2a; }
     }
