@@ -7,7 +7,7 @@
   // Endpoints whose full response bodies adapters need (usage / limits / billing).
   const WATCH = /rate[-_]?limit|usage|limits|conversation\/init|quota|credit|billing|balance|entitlement|subscription|rpcids=[^&]*jSf9Qc/i;
   // Analytics/telemetry endpoints that would flood the discovery log.
-  const NOISE = /\/_data\/|cdn-cgi|\/rum\b|analytics|telemetry|statsig|sentry|segment|amplitude|datadog|event_logging|\/log(s|ging)?\b|\/events?\b|\/t\/?$/i;
+  const NOISE = /\/_data\/|cdn-cgi|\/rum\b|analytics|telemetry|statsig|sentry|segment|amplitude|datadog|event_logging|\/ping\b|heartbeat|\/log(s|ging)?\b|\/events?\b|\/t\/?$/i;
   // Never forward bodies from auth endpoints: they carry identity and tokens.
   const PRIVATE = /\/auth\/|\/session\b|\/token\b|\/me\b|\/account\b|\/profile\b/i;
   const BINARY = /grpc|proto|octet-stream/i;

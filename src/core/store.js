@@ -8,20 +8,41 @@
     return AM.mergeSettings(settings);
   };
 
+  // Writes are chained so a record followed quickly by a relabel can't lose either change.
+  let eventChain = Promise.resolve();
+  const mutate = (provider, fn) => {
+    const key = 'events.' + provider;
+    const run = eventChain.then(async () => {
+      const got = await chrome.storage.local.get(key);
+      const arr = fn(got[key] || []);
+      await chrome.storage.local.set({ [key]: arr });
+      return arr;
+    });
+    eventChain = run.catch(() => {});
+    return run;
+  };
+
   AM.events = {
     async list(provider) {
+      await eventChain;
       const key = 'events.' + provider;
       const got = await chrome.storage.local.get(key);
       return got[key] || [];
     },
     // Only the model name and a timestamp are stored, never prompt text.
-    async record(provider, model) {
-      const key = 'events.' + provider;
+    record(provider, model) {
       const now = Date.now();
-      const arr = (await AM.events.list(provider)).filter((e) => now - e.t < KEEP_MS);
-      arr.push({ t: now, m: String(model || '').slice(0, 80) });
-      await chrome.storage.local.set({ [key]: arr });
-      return arr;
+      return mutate(provider, (arr) => {
+        const kept = arr.filter((e) => now - e.t < KEEP_MS);
+        kept.push({ t: now, m: String(model || '').slice(0, 80) });
+        return kept;
+      });
+    },
+    relabelLast(provider, model) {
+      return mutate(provider, (arr) => {
+        if (arr.length) arr[arr.length - 1].m = String(model || '').slice(0, 80);
+        return arr;
+      });
     },
   };
 
@@ -29,6 +50,7 @@
     const report = (events) => ctx.report('estimate', AM.countMeters(events, ctx.quotas()));
     return {
       record: async (model) => report(await AM.events.record(provider, model)),
+      relabelLast: async (model) => report(await AM.events.relabelLast(provider, model)),
       refresh: async () => report(await AM.events.list(provider)),
     };
   };

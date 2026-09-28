@@ -3,7 +3,7 @@
   if (window.top !== window) return;
 
   const host = location.hostname;
-  const NOISE = /\/_data\/|cdn-cgi|\/rum\b|analytics|telemetry|statsig|sentry|segment|amplitude|datadog|event_logging|\/log(s|ging)?\b|\/events?\b|\/t\/?$/i;
+  const NOISE = /\/_data\/|cdn-cgi|\/rum\b|analytics|telemetry|statsig|sentry|segment|amplitude|datadog|event_logging|\/ping\b|heartbeat|\/log(s|ging)?\b|\/events?\b|\/t\/?$/i;
   // Debug log records the structure of a request body (key names, model-like values), never message text.
   const MODELISH = /model|mode|kind|type|effort|reasoning/i;
   const bodyShape = (body) => {

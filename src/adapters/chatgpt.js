@@ -3,7 +3,11 @@
 // and feature counters (deep research, images) from conversation/init.
 (() => {
   const AM = globalThis.AIMeter;
-  const SEND_RE = /\/backend-api\/(f\/)?conversation(\?|$)/;
+  const SEND_RE = /\/(backend-api|unauth-mweb)\/(f\/)?conversation(\?|$)/;
+  // The anti-bot token is fetched right before every send, signed in or out, even when the
+  // send itself isn't visible to the page hook (signed-out chat streams it elsewhere).
+  const PRESEND_RE = /\/sentinel\/chat-requirements(\/finalize)?(\?|$)/;
+  const MERGE_MS = 5000;
   const TOKEN_TTL = 10 * 60e3;
 
   AM.register({
@@ -16,10 +20,17 @@
       this.tok = null;
       this.tokAt = 0;
       this.est = AM.estimator(ctx, 'chatgpt');
+      this.lastSend = 0;
       ctx.onRequest((d) => {
-        if (d.method !== 'POST' || !SEND_RE.test(d.url)) return;
-        const b = AM.safeJSON(d.body);
-        this.est.record((b && b.model) || 'auto');
+        if (d.method !== 'POST') return;
+        const isSend = SEND_RE.test(d.url);
+        if (!isSend && !PRESEND_RE.test(d.url)) return;
+        const model = isSend ? AM.safeJSON(d.body)?.model : null;
+        const fresh = Date.now() - this.lastSend > MERGE_MS;
+        this.lastSend = Date.now();
+        // One message fires both signals; count once, but let the real send upgrade the model name.
+        if (fresh) this.est.record(model || 'auto');
+        else if (model && model !== 'auto') this.est.relabelLast(model);
         clearTimeout(this.t);
         this.t = setTimeout(() => this.refresh(), 8000);
       });
@@ -49,6 +60,7 @@
 
     async refresh() {
       this.est.refresh();
+      if (Date.now() < (this.noAuthUntil || 0)) return;
       try {
         const tok = await this.token();
         this.parseUsage(await this.ctx.getJSON('/backend-api/wham/usage', {
@@ -58,6 +70,7 @@
       } catch (e) {
         this.ctx.log('wham/usage failed:', e.message);
         if (/^40[13]/.test(e.message)) this.tok = null;
+        if (/no access token/.test(e.message)) this.noAuthUntil = Date.now() + 10 * 60e3;
       }
     },
 
