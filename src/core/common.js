@@ -186,7 +186,10 @@
   // What the pill and badge show: the shortest-window (session) limit, unless another limit is already
   // exhausted — then that one, since it's what's actually blocking.
   AM.primaryMeter = (meters) => {
-    const list = (meters || []).filter((m) => AM.pctOf(m) != null || m.remaining != null || m.used != null);
+    const all = (meters || []).filter((m) => AM.pctOf(m) != null || m.remaining != null || m.used != null);
+    // Secondary meters (model-specific buckets) only drive the pill if nothing else is available.
+    const main = all.filter((m) => !m.secondary);
+    const list = main.length ? main : all;
     if (!list.length) return (meters && meters[0]) || null;
     const blocked = list.filter((m) => AM.pctOf(m) >= 100);
     const pool = blocked.length ? blocked : list;

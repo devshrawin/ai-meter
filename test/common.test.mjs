@@ -124,6 +124,16 @@ test('primaryMeter switches to whatever limit is exhausted', () => {
   assert.equal(AM.sortMeters([ms[1], ms[0]])[0].id, 'five_hour');
 });
 
+test('primaryMeter ignores a maxed-out secondary bucket', () => {
+  const ms = [
+    { id: 'five_hour', label: 'Session (5h)', pct: 2 },
+    { id: 'seven_day', label: 'Weekly', pct: 22 },
+    { id: 'nimbus_quill', label: 'Nimbus Quill', pct: 100, secondary: true },
+  ];
+  assert.equal(AM.primaryMeter(ms).id, 'five_hour');
+  assert.equal(AM.primaryMeter([{ id: 'x', pct: 100, secondary: true }]).id, 'x');
+});
+
 test('formatDuration', () => {
   assert.equal(AM.formatDuration(30 * 60e3), '30m');
   assert.equal(AM.formatDuration(90 * 60e3), '1h 30m');

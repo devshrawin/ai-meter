@@ -2,13 +2,16 @@
 (() => {
   const AM = globalThis.AIMeter;
 
-  const LIMIT_RE = /(you['’]ve (hit|reached|used up)|usage limit|message limit|limit reached|reached your (usage |message )?limit|out of (free )?messages|too many (requests|messages)|rate limit(ed)?)/i;
+  // Only wording a site uses to tell *you* you're blocked. Bare phrases like "rate limit" or
+  // "usage limit" are excluded: they turn up in ordinary conversation (e.g. chatting about limits).
+  const LIMIT_RE = /(you['’]ve (hit|reached|used up) (your|the)\b|you have (hit|reached) (your|the)\b|\blimit reached\b|reached (your|the) (usage |message |daily |weekly )?limit|out of (free )?messages|usage limit (reached|exceeded)|too many (requests|messages)[.,!]? (please )?(try|wait))/i;
   const REMAINING_RE = /\b(\d+)\s+(messages?|prompts?|queries|requests)\s+(remaining|left)\b/i;
   // Chat content, inputs and code blocks: text there is conversation, not a notice.
   const SKIP = [
-    '[data-message-author-role]', '[data-testid*="message"]', '[data-test-render-count]',
-    '.markdown', '.prose', '.font-claude-message', '[contenteditable]', 'textarea', 'pre', 'code',
-    'message-content', 'user-query', '.model-response-text', '.query-text',
+    '[data-message-author-role]', '[data-testid*="message"]', '[data-test-render-count]', '[data-is-streaming]',
+    '.markdown', '.prose', '[class*="markdown"]', '.font-claude-message', '.font-claude-response',
+    '.font-user-message', '[contenteditable]', 'textarea', 'pre', 'code', 'article', '[role="article"]',
+    'message-content', 'user-query', 'model-response', '.model-response-text', '.query-text',
   ].join(',');
   const MAX_PENDING = 400;
 

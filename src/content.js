@@ -67,9 +67,15 @@
 
   function current() {
     const now = Date.now();
-    const hasReal = (groups.real || []).length > 0;
+    const real = groups.real || [];
+    const hasReal = real.length > 0;
+    // The provider's own numbers beat guesses: if its main limits say you're not blocked, ignore
+    // "limit reached" notices and 429s (which can be false alarms).
+    const primary = real.filter((m) => !m.secondary);
+    const realSaysOk = primary.length > 0 && primary.every((m) => (AM.pctOf(m) ?? 0) < 95);
     return Object.entries(groups)
       .filter(([g]) => !(adapter.preferReal && hasReal && g === 'estimate'))
+      .filter(([g]) => !(realSaysOk && (g === 'banner' || g === 'ratelimit')))
       .flatMap(([, ms]) => ms)
       .filter((m) => m.source !== 'banner' || (m.resetAt ? m.resetAt > now : now - (m.seenAt || now) < 3600e3))
       .map((m) => ({ ...m, pct: AM.pctOf(m) }));
@@ -95,7 +101,8 @@
       }
     } else if (d.kind === 'response') {
       if (!d.shapeOnly) resSubs.forEach((f) => safe(f, d));
-      if (d.status === 429) {
+      // Only a 429 on a real request counts, not on background telemetry.
+      if (d.status === 429 && !NOISE.test(d.url)) {
         const wait = AM.toTime(d.retryAfter, 'rel');
         ctx.report('ratelimit', [{ id: 'ratelimit', label: 'Rate limited', pct: 100, source: 'banner', seenAt: Date.now(), resetAt: wait }]);
       }
