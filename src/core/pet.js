@@ -23,7 +23,7 @@
       pointer-events: none; z-index: 1; will-change: transform; -webkit-tap-highlight-color: transparent; }
     .pet .rig { position: absolute; inset: 0; transform-origin: 50% 100%; will-change: transform;
       filter: drop-shadow(0 .5px .8px rgba(70, 70, 100, .45)) drop-shadow(0 2px 3px rgba(40, 40, 80, .14)); }
-    .pet img { position: absolute; opacity: 0; pointer-events: none; cursor: pointer; user-select: none; -webkit-user-drag: none; }
+    .pet img { position: absolute; opacity: 0; pointer-events: none; cursor: grab; user-select: none; -webkit-user-drag: none; }
     .pet .shadow { position: absolute; left: 50%; bottom: -3px; width: 44px; height: 7px; margin-left: -22px; border-radius: 50%;
       background: radial-gradient(closest-side, rgba(40, 40, 80, .22), rgba(40, 40, 80, 0)); pointer-events: none; will-change: transform, opacity; }
     .pet .fx { position: absolute; left: 50%; top: -6px; pointer-events: none; font: 700 14px ui-sans-serif, system-ui, sans-serif;
@@ -121,6 +121,7 @@
     let x = 0, y = 0, dir = 1, vel = 0, phase = 0;
     let mood = 'happy', busy = false, reacting = false, inAir = false, walking = false, sleeping = false;
     let base = 'sit', over = null, overT = 0, overA = 0, fadeMs = 120;
+    let hurry = false, held = null, gone = false;
     let walkOn = false, sleepOn = false, sleepT0 = 0, nextZ = 0;
     let piv = 0, pivT = 0, bob = 0, breathAmp = 0, shadowA = 1, brainWake = 900, clicks = [];
     // Turn-swap: front<->side changes happen while she's squeezed thin (a turn), never as a crossfade.
@@ -234,6 +235,8 @@
         nextZ = now + 1500;
       }
       if (trip && trip.watch && !trip.broken) checkPerch(trip);
+      // The pill fills in (and widens) just after she's created: keep her pinned to home meanwhile.
+      if (now < 1200 && !busy && !reacting && y === 0) x = Math.max(4, pill.offsetWidth - BOX_W - 4);
     };
 
     const render = () => {
@@ -286,12 +289,12 @@
       const d = Math.sign(tx - x);
       if (!walking) await startWalk(d);
       else if (d !== dir) { faceTo(d); kick(-0.5); }
-      const vmax = mood === 'stressed' ? 52 : lively ? 28 : 22;
+      const vmax = hurry ? 120 : mood === 'stressed' ? 52 : lively ? 28 : 22;
       const acc = vmax / 0.3;
       const hopping = gait() === 'hop';
       const eight = gait() === 'walk8';
       // px per hop / per walk frame (8-frame cycle ≈ 12 fps calm, ≈ 16 fps stressed)
-      const stride = hopping ? (mood === 'stressed' ? 11 : 9) : eight ? (mood === 'stressed' ? 3.2 : 2.35) : mood === 'stressed' ? 4.4 : 3.5;
+      const stride = hurry ? (hopping ? 16 : eight ? 5.5 : 7) : hopping ? (mood === 'stressed' ? 11 : 9) : eight ? (mood === 'stressed' ? 3.2 : 2.35) : mood === 'stressed' ? 4.4 : 3.5;
       await run((s) => {
         const rem = (tx - x) * d;
         if (rem <= 0.2) return true;
@@ -681,12 +684,104 @@
       } catch (e) {
         if (e !== CANCEL) console.error(e);
       }
-      trip = null;
-      if (t.broken === 'recall') return true;  // setDragging already put her back on the pill
+      if (trip === t) trip = null;
+      if (t.broken === 'recall' || t.broken === 'grabbed') return true;  // the pill drag / a pick-up already has her
       if (t.broken) await tumble();
       const b = bounds();
       await leap(clamp(x, b.min, b.max), 0);
       return true;
+    }
+
+    // ---- picked up: carried by the scruff, dropped anywhere on the page, then runs back to the pill ----
+    const HANG = 62; // cursor -> feet while she dangles
+    // First wide-enough top edge at or below (fx, fy) on what's visibly under her; null = the window's bottom.
+    function surfaceBelow(fx, fy) {
+      for (let py = Math.max(ROOM_ABOVE, Math.round(fy)); py < innerHeight - 8; py += 4) {
+        const top = document.elementsFromPoint(fx, py).find((e) => e !== hostEl && !hostEl.contains(e));
+        for (let e = top; e && e !== document.body && e !== document.documentElement; e = e.parentElement) {
+          const r = e.getBoundingClientRect();
+          if (r.top <= py && r.top > py - 4.5 && r.width >= BOX_W + 16 && r.left >= -1 && r.right <= innerWidth + 1) return e;
+        }
+      }
+      return null;
+    }
+
+    async function carried() {
+      if (sleeping || sleepOn) { sleepOn = false; sleeping = false; }
+      walkOn = false; walking = false;
+      pose('fall', 70);
+      setAir(true);
+      kick(1.6);
+      particle(pick(['mrrp?!', 'hey!', 'nya?']), { tone: 'dark' });
+      let px = x;
+      await run((s) => {
+        const vx = s > 0 ? (x - px) / s : 0;
+        px = x;
+        rot.t = clamp(-vx * 0.035, -28, 28) + 4 * Math.sin(now / 260); // swings behind the hand, dangles a little
+        sq.t = 1.04;
+        return !held || held.dropped;
+      });
+      const o = origin();
+      const fx = clamp(o.left + x + BOX_W / 2, BOX_W / 2, innerWidth - BOX_W / 2);
+      const surface = surfaceBelow(fx, o.line + y);
+      const gy = (surface ? surface.getBoundingClientRect().top : innerHeight - 4) - o.line;
+      held = null;
+      // Gravity down to the surface.
+      pose('fall', 60);
+      let vy = 0;
+      await run((s) => {
+        vy += 1700 * s;
+        y += vy * s;
+        rot.t *= Math.max(0, 1 - s * 6);
+        sq.t = 1 + Math.min(0.1, vy / 3000);
+        if (y >= gy) { y = gy; return true; }
+        return false;
+      });
+      setAir(false);
+      rot.t = 0; sq.t = 1;
+      pose('crouch', 60);
+      kick(-2.6);
+      await W(200);
+      const t = { kind: 'drop', el: surface, broken: null, watch: false, start: null };
+      trip = t;
+      try {
+        if (surface) { t.start = lineOf(surface, 'drop'); t.watch = true; }
+        pose('sit-happy', 160);
+        particle(pick(['mrrp', '♥', 'nya~', '?']));
+        await W(900);
+        pose(idleFrame(), 220);
+        const end = now + rand(2500, 6000);
+        while (now < end) {
+          const r = Math.random();
+          if (r < 0.25) await groom();
+          else if (r < 0.4) await mew();
+          else await W(rand(900, 1800));
+        }
+      } catch (e) {
+        if (e !== CANCEL) throw e;
+      }
+      t.watch = false;
+      if (trip === t) trip = null;
+      if (t.broken === 'recall' || t.broken === 'grabbed') return;
+      if (t.broken) await tumble();
+      await runHome(t.broken ? null : t);
+    }
+
+    // Spot the pill, dash along whatever she's standing on toward it, then leap back on.
+    async function runHome(t) {
+      const b = bounds();
+      const o = origin();
+      let lo = 4 - o.left, hi = innerWidth - o.left - BOX_W - 4;
+      if (t && t.el && t.el.isConnected) [lo, hi] = perchRange(t);
+      faceTo(b.max - x || 1);
+      pose('sit-happy', 120);
+      particle('!', { tone: 'dark' });
+      kick(1.4);
+      await W(450);
+      hurry = true;
+      try { await walkTo(clamp(b.max, lo, Math.max(lo, hi)), false); } finally { hurry = false; }
+      walking = false;
+      await leap(clamp(x, b.min, b.max), 0);
     }
 
     // Ask for a trip; the brain starts it as soon as she's free (stale requests are dropped).
@@ -707,9 +802,14 @@
       AM.bus.addEventListener('limit', onLimit);
     }
 
+    // Home is the right end of the pill: it keeps her clear of the chat box's send button.
+    const home = () => bounds().max;
+    const awayFromHome = () => Math.abs(x - home()) > 6;
+
     async function behave() {
       if (mood === 'sleep') {
         if (y > 0) await jumpUp();
+        if (!sleeping && y === 0 && awayFromHome()) await walkTo(home());
         if (!sleeping) await lieDown();
         return 6000;
       }
@@ -728,23 +828,26 @@
         nextIdleTrip = Date.now() + idleTripGap();
         if (await tripFor('idle')) return rand(2500, 5000);
       }
-      if (x > b.max) { await walkTo(b.max); return 1500; }
+      // After any stroll, game, fall or trip she heads back home and settles there.
+      if (awayFromHome()) { await walkTo(b.max); return lively ? rand(1500, 3000) : rand(5000, 10000); }
       const r = Math.random();
       const side = Math.random() < 0.5 ? -1 : 1;
       if (lively) {
         if (r < 0.12 && roomFor(side)) await fall(side);
-        else if (r < 0.5) await walkTo(rand(b.min, b.max));
+        else if (r < 0.5) { await walkTo(rand(b.min, b.max)); await W(rand(600, 1400)); await walkTo(home()); }
         else if (r < 0.66) await groom();
         else if (r < 0.74) await stretch();
         else if (r < 0.86) await playYarn();
+        if (y === 0 && awayFromHome()) await walkTo(home());
         return rand(2200, 5600);
       }
       // Calm: about half the time she just sits there; short strolls, rare tumbles.
       if (r < 0.03 && roomFor(side)) await fall(side);
-      else if (r < 0.22) await walkTo(clamp(x + side * rand(30, 90), b.min, b.max));
+      else if (r < 0.22) { await walkTo(clamp(b.max - rand(24, 60), b.min, b.max)); await W(rand(900, 1800)); await walkTo(home()); } // out and straight back
       else if (r < 0.33) await groom();
       else if (r < 0.38) await stretch();
       else if (r < 0.46) await playYarn();
+      if (y === 0 && awayFromHome()) await walkTo(home()); // never idle anywhere but home
       return rand(7000, 15000);
     }
 
@@ -890,6 +993,8 @@
       // Sent home: say bye, walk off the end of the pill and fade out. Resolves when she's gone.
       async leave() {
         if (!alive) return;
+        gone = true;
+        held = null;
         gen++;
         cleanup();
         reacting = true;
@@ -925,6 +1030,28 @@
           pose(idleFrame(), 0);
         }
       },
+      // Pick her up at (cx, cy) in viewport px; false if she can't be carried right now.
+      grab(cx, cy) {
+        if (!alive || gone || reduce || dragging || held) return false;
+        if (trip) breakTrip('grabbed');
+        pendingTrip = null;
+        held = { dropped: false };
+        this.carry(cx, cy);
+        act(carried);
+        return true;
+      },
+      carry(cx, cy) {
+        if (!held || held.dropped) return;
+        const o = origin();
+        x = clamp(cx, 0, innerWidth) - o.left - BOX_W / 2;
+        y = clamp(cy, 0, innerHeight) + HANG - o.line;
+      },
+      drop(cx, cy) {
+        if (!held) return;
+        if (cx != null) this.carry(cx, cy);
+        held.dropped = true;
+      },
+      get held() { return !!held; },
       get tripping() { return !!trip; },
       destroy() {
         alive = false;

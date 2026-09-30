@@ -43,6 +43,8 @@ along the pill. Now and then she teeters off the edge, tumbles, sits dazed and l
 mood follows your session limit: calm, then worried, then stressed, and asleep in a loaf at 100%.
 Click her for a reaction (eight quick clicks for a special one). Now and then she plays with a yarn ball, batting it along the pill until she knocks it off the edge.
 - **Energy** (Settings → Iris): *Calm* is the default. She mostly sits, with 7–15 s between actions, short strolls, rare tumbles and page wanders every 4–8 min. *Lively* is busier.
+- **Home spot:** she rests at the right end of the pill, clear of the chat box's send button, and walks back there after every stroll or game.
+- **Pick her up:** drag Iris (not the pill) to carry her by the scruff. Let go over anything on the page and she drops onto the first edge below, sits a few seconds, then runs back and jumps onto the pill. A click still pets her.
 - **Send Iris home:** a button in Settings, or the link at the bottom of the pill's panel. She says bye and walks off; "Bring Iris back" returns her.
 She pauses in hidden tabs and sits still if you have reduced motion turned on.
 

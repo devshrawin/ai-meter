@@ -159,19 +159,26 @@
       try { target.setPointerCapture(e.pointerId); } catch {}
     });
     target.addEventListener('pointermove', (e) => {
-      // Grabbing Iris herself is always a click, never a drag (she may be perched far from the pill).
-      if (!start || start.onPet) return;
+      if (!start) return;
       const dx = e.clientX - start.x;
       const dy = e.clientY - start.y;
+      // Dragging Iris herself picks her up and carries her (the pill stays put).
+      if (start.onPet) {
+        if (!start.carrying && Math.hypot(dx, dy) >= 6 && pet && pet.grab) start.carrying = pet.grab(e.clientX, e.clientY);
+        if (start.carrying) { start.moved = true; pet.carry(e.clientX, e.clientY); }
+        return;
+      }
       if (!start.moved && Math.hypot(dx, dy) < 4) return;
       if (!start.moved && pet) pet.setDragging(true);
       start.moved = true;
       host.style.right = Math.max(0, Math.min(innerWidth - 60, start.right - dx)) + 'px';
       host.style.bottom = Math.max(0, Math.min(innerHeight - 30, start.bottom - dy)) + 'px';
     });
-    const end = () => {
+    const end = (e) => {
       if (!start) return;
-      if (start.moved) {
+      if (start.carrying) {
+        if (pet) pet.drop(e && e.clientX, e && e.clientY);
+      } else if (start.moved) {
         savePos({ right: parseInt(host.style.right, 10), bottom: parseInt(host.style.bottom, 10) });
         if (pet) pet.setDragging(false);
       } else if (start.onPet && pet) pet.react();
@@ -179,7 +186,11 @@
       start = null;
     };
     target.addEventListener('pointerup', end);
-    target.addEventListener('pointercancel', () => { if (start && start.moved && pet) pet.setDragging(false); start = null; });
+    target.addEventListener('pointercancel', () => {
+      if (start && start.carrying && pet) pet.drop();
+      else if (start && start.moved && pet) pet.setDragging(false);
+      start = null;
+    });
   }
 
   function cacheState(chat, now) {
