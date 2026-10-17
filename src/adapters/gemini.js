@@ -90,6 +90,7 @@
 
     parse(text) {
       const { meters, error } = AM.parseGeminiUsage(text);
+      this.ctx.log('Gemini usage parsed:', meters.length ? meters.map((m) => `${m.label} raw=${m.raw} -> ${m.pct}%`).join(', ') : error);
       if (meters.length) this.ctx.report('real', meters);
       else this.ctx.log('Gemini usage parse:', error);
     },

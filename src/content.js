@@ -44,6 +44,7 @@
     onRequest: (fn) => reqSubs.push(fn),
     onResponse: (fn) => resSubs.push(fn),
     visible: () => document.visibilityState === 'visible',
+    debug: () => !!settings.debug,
     log: (...a) => {
       if (!settings.debug) return;
       console.log('[AI Meter]', adapter.id, ...a);

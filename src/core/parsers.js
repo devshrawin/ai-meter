@@ -90,6 +90,7 @@
         id: type === 1 ? 'session' : type === 2 ? 'weekly' : `bucket-${type}`,
         label: type === 1 ? 'Session (5h)' : type === 2 ? 'Weekly' : `Bucket ${type}`,
         pct: ratioToPct(ratio),
+        raw: ratio,
         resetAt: sec != null ? Math.round((sec + (num(ts[1]) || 0) / 1e9) * 1000) : undefined,
         source: 'real',
       });
@@ -271,10 +272,11 @@
     const hasPeriod = out.varints.some((v) => v.path.startsWith('1.6') || (v.path === '1.8.1' && (v.value === 1 || v.value === 2)));
 
     let pct = pctField ? pctField.value : null;
-    if (pct == null && !out.floats.length && resetAt && hasPeriod) pct = 0;
+    let inferred = false; // no usage field at all: protobuf omits zeros, but this call may simply not report usage
+    if (pct == null && !out.floats.length && resetAt && hasPeriod) { pct = 0; inferred = true; }
     if (pct == null) return { meters: [], error: 'no usage percent in payload' };
     return {
-      meters: [{ id: 'weekly', label: 'Weekly usage', pct: Math.round(pct * 10) / 10, resetAt, source: 'real' }],
+      meters: [{ id: 'weekly', label: 'Weekly usage', pct: Math.round(pct * 10) / 10, resetAt, source: 'real', ...(inferred ? { inferred: true } : {}) }],
       error: null,
     };
   };

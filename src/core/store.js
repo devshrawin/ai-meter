@@ -134,7 +134,10 @@
       const { 'debug.log': log = [] } = await storage.get('debug.log');
       if (AM.dead) return;
       log.unshift({ t: Date.now(), ...entry });
-      await storage.set({ 'debug.log': log.slice(0, 60) });
+      // Adapter notes (parse results, failures) are kept separately so a chatty site's network traffic can't push them out.
+      const notes = log.filter((e) => e.kind === 'note').slice(0, 40);
+      const rest = log.filter((e) => e.kind !== 'note').slice(0, 60);
+      await storage.set({ 'debug.log': [...notes, ...rest].sort((a, b) => b.t - a.t) });
     }).catch(() => {});
     return logChain;
   };
