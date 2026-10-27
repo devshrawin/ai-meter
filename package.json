@@ -1,6 +1,6 @@
 {
   "name": "ai-meter",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "private": true,
   "description": "Chrome extension showing usage-limit meters for Claude, ChatGPT, Gemini, Grok and Perplexity.",
   "scripts": {

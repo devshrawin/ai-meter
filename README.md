@@ -25,11 +25,11 @@ Every meter is tagged with where its number came from:
 |---|---|---|---|
 | Claude | `real` | `GET /api/organizations/{org}/usage` — the endpoint behind Settings › Usage. Session (5h) + weekly utilization and reset times. | yes |
 | ChatGPT | `estimate` + `real` | Chat caps aren't exposed anywhere, so sends are counted per model (defaults: 160 / 3h, Thinking 3000 / week). Real Codex 5h / weekly windows from `GET /backend-api/wham/usage` (Bearer from `/api/auth/session`, kept in memory only), plus `limits_progress` feature counters. | no |
-| Gemini | `real` | Replays the `jSf9Qc` batchexecute RPC behind gemini.google.com/usage → 5h + weekly usage. Falls back to counting prompts. | no |
-| Grok | `real` | Weekly percentage pool from `GrokBuildBilling/GetGrokCreditsConfig` (gRPC-web protobuf, decoded in-extension). Sends detected on the `/ws/mgw` WebSocket. | endpoints yes, numbers no |
+| Gemini | `real` | Replays the `jSf9Qc` batchexecute RPC behind gemini.google.com/usage → 5h + weekly usage. Falls back to counting prompts. | yes (2026-10-17) |
+| Grok | `real` | Per-model chat limits from `POST /rest/rate-limits` (`remainingQueries` / `totalQueries` over a 24h window on the free tier; counts down as you chat). The gRPC-web `GrokBuildBilling/GetGrokCreditsConfig` weekly pool is the separate Grok Build credit pool and is shown only if it reports usage. Sends detected on the `/ws/mgw` WebSocket. | yes (2026-10-17) |
 | Perplexity | `real` | `GET /rest/rate-limit/all` → remaining Pro searches / research / labs. | no |
 | Kimi | `real` | `MembershipService/GetSubscription` → `balances[].amountUsedRatio`. | no |
-| DeepSeek, Qwen, Le Chat, Copilot, Meta AI, Poe | `estimate` | None of these expose usage; sends are counted (Le Chat default 25 / day). | no |
+| DeepSeek, Qwen, Le Chat, Copilot (copilot.com, formerly copilot.microsoft.com), Meta AI, Poe | `estimate` | None of these expose usage; sends are counted (Le Chat default 25 / day). | no |
 | Any site you add | `estimate` | Settings → Other AI sites. Sends detected heuristically (chat-like POST or WebSocket text frame). | — |
 
 Every site also gets two free signals: the site's own limit notices (banner watcher) and HTTP 429 responses (with `Retry-After` as the reset time).
@@ -140,6 +140,10 @@ AIMeter.register({
 ```
 
 Then add it to `content_scripts` + `host_permissions` in `manifest.json` and to `AM.PROVIDERS` in `src/core/quotas.js`.
+
+## Smoke-testing every site
+
+`tools/site-smoke/` injects the extension's real scripts into a live page with an in-memory `chrome.*` stub, for checking that it mounts, picks the right adapter, hooks the network and finds the chat box, header and perch selectors, without installing the extension. Run `node tools/site-smoke/build.mjs 8801`, serve the repo root with `python -m http.server 8801`, and open `http://localhost:8801/tools/site-smoke/loader.html?to=https://grok.com` in a browser (the bundle rides along in `window.name`; sites that isolate tabs, like ChatGPT, clear it and only the selector checks can run). Signed-out only: usage endpoints need a login. Last run 2026-10-27: see `docs/site-smoke-2026-10-27.md`.
 
 ## Development
 

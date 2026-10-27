@@ -14,7 +14,7 @@
     { id: 'deepseek', name: 'DeepSeek', hosts: ['chat.deepseek.com'], source: 'estimate' },
     { id: 'qwen', name: 'Qwen', hosts: ['chat.qwen.ai'], source: 'estimate' },
     { id: 'mistral', name: 'Le Chat', hosts: ['chat.mistral.ai'], source: 'estimate' },
-    { id: 'copilot', name: 'Copilot', hosts: ['copilot.microsoft.com'], source: 'estimate' },
+    { id: 'copilot', name: 'Copilot', hosts: ['copilot.microsoft.com', 'copilot.com'], source: 'estimate' },
     { id: 'meta', name: 'Meta AI', hosts: ['meta.ai'], source: 'estimate' },
     { id: 'poe', name: 'Poe', hosts: ['poe.com'], source: 'estimate' },
   ];

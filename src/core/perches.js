@@ -21,7 +21,8 @@
   AM.PERCHES = {
     chatgpt: {
       composer: 'form:has([data-composer-submit])',
-      header: 'header[data-desktop-header], header[data-mobile-header]',
+      // ChatGPT's 2026-10 redesign dropped data-desktop-header / data-mobile-header; the bar is now header[data-slot="header"].
+      header: 'header[data-slot="header"], header[data-desktop-header], header[data-mobile-header]',
       // The submit button declares both labels (data-send-label / data-stop-label) and swaps its
       // aria-label between them, so this works in any UI language.
       replying: () => {

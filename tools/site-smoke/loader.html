@@ -1,0 +1,9 @@
+<!doctype html><meta charset="utf-8"><title>smoke loader</title>
+<script>
+  // Stashes the bundle in window.name (survives cross-site navigation), then goes to the target: loader.html?to=https://site
+  fetch('/tools/site-smoke/dist/smoke-bundle.js').then((r) => r.text()).then((t) => {
+    window.name = '__SMOKE__' + t;
+    const to = new URLSearchParams(location.search).get('to');
+    if (to) location.href = to; else document.body.textContent = 'stashed ' + t.length;
+  });
+</script>
