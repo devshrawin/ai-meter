@@ -165,9 +165,37 @@
 
   AM.resetText = (m, now = Date.now()) => {
     if (!m.resetAt) return '';
+    if (m.resetAt - now <= 0) return m.source === 'estimate' ? 'frees up now' : 'reset due';
     const d = AM.formatDuration(m.resetAt - now);
     return m.source === 'estimate' ? `next frees in ${d}` : `resets in ${d}`;
   };
+
+  // Popup layout helpers. Bar meters have a percentage; counters (e.g. "5 left" with no limit) get chips instead.
+  AM.splitMeters = (meters) => {
+    const sorted = AM.sortMeters(meters);
+    return { bars: sorted.filter((m) => AM.pctOf(m) != null), counters: sorted.filter((m) => AM.pctOf(m) == null && AM.meterValue(m)) };
+  };
+
+  AM.STALE_MS = 24 * 3600e3;
+  AM.isStale = (entry, now = Date.now()) => !entry || !entry.updatedAt || now - entry.updatedAt > AM.STALE_MS;
+
+  // One badge per card: "real" if any meter comes from the provider, else "estimate"; mixed cards tag only the estimate rows.
+  AM.cardSource = (meters) => {
+    const src = new Set((meters || []).map((m) => m.source));
+    if (src.has('real') || src.has('banner')) return src.has('estimate') ? 'mixed' : 'real';
+    return src.has('estimate') ? 'estimate' : '';
+  };
+
+  // Fresh cards first, then the one closest to its limit, then provider order.
+  AM.sortEntries = (entries, order, now = Date.now()) => entries.slice().sort((a, b) => {
+    const sa = AM.isStale(a, now) ? 1 : 0;
+    const sb = AM.isStale(b, now) ? 1 : 0;
+    if (sa !== sb) return sa - sb;
+    const pa = AM.pctOf(AM.primaryMeter(a.meters) || {}) ?? -1;
+    const pb = AM.pctOf(AM.primaryMeter(b.meters) || {}) ?? -1;
+    if (pa !== pb) return pb - pa;
+    return order(a.provider) - order(b.provider) || a.name.localeCompare(b.name);
+  });
 
   AM.level = (pct) => (pct == null ? 'none' : pct >= 90 ? 'high' : pct >= 75 ? 'mid' : 'low');
 

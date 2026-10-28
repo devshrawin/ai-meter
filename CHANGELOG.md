@@ -2,6 +2,13 @@
 
 All notable changes to AI Meter. Versions follow `manifest.json`.
 
+## 0.9.1 — 2026-10-28
+
+### Changed
+- **Popup redesign.** Pearl-lavender look to match the pill, with dark mode. Cards show a status LED, one source badge per card (real or est) instead of one per row, and sort fresh first, then closest to its limit. Percentage limits are compact bars; counter-only limits (e.g. "5 left") are chips, with extras folded behind "Show all N limits". Providers not updated for a day are dimmed and marked stale. Icon buttons, summary line, "+ Add site" link and a friendlier empty state.
+- A reset time that has already passed now reads "reset due" / "frees up now" instead of "resets in now".
+- Added `tools/popup-preview` (the real popup with a stubbed `chrome.*` and sample data) for looking at the popup in any browser.
+
 ## 0.9.0 — 2026-10-28
 
 Pre-ship pass for the Chrome Web Store.

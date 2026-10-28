@@ -9,3 +9,4 @@ tools/site-smoke/dist/
 # local, regenerated artefacts
 brag-output/
 .smoke-frames/
+tools/popup-preview/index.html
