@@ -84,6 +84,7 @@
       } catch (e) {
         this.ctx.log('usage fetch failed:', e.message);
         if (/^40[134]/.test(e.message)) this.org = null;
+        this.ctx.problem(AM.errIsAuth(e) ? 'signin' : 'error', AM.errIsAuth(e) ? '' : 'Usage request failed: ' + AM.errText(e));
       }
     },
 
@@ -105,7 +106,7 @@
         });
       }
       if (meters.length) this.ctx.report('real', meters);
-      else this.ctx.log('usage response had no utilization fields', j);
+      else { this.ctx.log('usage response had no utilization fields', j); this.ctx.problem('error', 'The usage response had no usage figures'); }
     },
   });
 })();

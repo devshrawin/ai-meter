@@ -26,6 +26,8 @@
   const resSubs = [];
   const groups = {};
   const pending = [];
+  let problem = null; // { kind: 'error' | 'signin', text, since }
+  let problemTimer = 0;
 
   const alive = () => AM.alive();
   const send = (msg) => {
@@ -52,8 +54,18 @@
     },
     report(group, meters) {
       groups[group] = meters || [];
+      if (group === 'real' && meters && meters.length) problem = null; // real numbers prove the usage path works
       publish();
     },
+    // An adapter could not get usage ('error') or the user is signed out ('signin'). Shown in the pill and panel.
+    problem(kind, text) {
+      const t = String(text || '').slice(0, 160);
+      if (!problem || problem.kind !== kind || problem.text !== t) problem = { kind, text: t, since: Date.now() };
+      clearTimeout(problemTimer);
+      problemTimer = setTimeout(publish, AM.PROBLEM_DELAY_MS + 200); // an 'error' becomes visible after the delay
+      publish();
+    },
+    clearProblem() { problem = null; publish(); },
     setChat(stats) {
       chat = stats;
       publish();
@@ -85,9 +97,30 @@
   function publish() {
     if (!adapter || !alive()) return;
     const meters = current();
-    AM.widget.update(adapter.name, meters, settings, settings.chatStats ? chat : null);
-    send({ type: 'aimeter:usage', provider: adapter.id, name: adapter.name, meters });
+    const shown = AM.problemToShow(problem, meters);
+    AM.widget.update(adapter.name, meters, settings, settings.chatStats ? chat : null, shown);
+    send({ type: 'aimeter:usage', provider: adapter.id, name: adapter.name, meters, problem: shown });
   }
+
+  // "Copy debug log": diagnostics for the current provider, from this tab's state plus the stored debug log.
+  AM.copyDiagnostics = async () => {
+    let log = [];
+    try { log = (await AM.storage.get('debug.log'))['debug.log'] || []; } catch {}
+    let version = '';
+    try { version = chrome.runtime.getManifest().version; } catch {}
+    const text = AM.buildDiagnostics({ version, provider: adapter && adapter.id, host, problem, meters: current(), log });
+    try { await navigator.clipboard.writeText(text); return true; } catch {}
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.cssText = 'position:fixed;left:-9999px;top:0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      ta.remove();
+      return ok;
+    } catch { return false; }
+  };
 
   function handle(d) {
     if (d.kind === 'pong') {

@@ -38,6 +38,15 @@
     .dot.high { --none: var(--high); animation: led-pulse 1.6s ease-in-out infinite; }
     @keyframes led-pulse { 50% { opacity: .55; } }
     .muted { color: var(--muted); }
+    .dot.warn { --none: #a09cb4; }
+    .warn-flag { color: var(--mid); font-weight: 700; }
+    .problem { margin: 2px 0 8px; padding: 8px 10px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--mid) 45%, var(--line));
+      background: color-mix(in srgb, var(--mid) 9%, transparent); }
+    .problem b { display: block; font-size: 12px; margin-bottom: 2px; }
+    .problem .why { font-size: 11px; color: var(--muted); word-break: break-word; }
+    .problem button { margin-top: 7px; font: inherit; font-size: 11px; font-weight: 600; color: var(--fg); background: var(--track);
+      border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; cursor: pointer; }
+    .problem button:hover { border-color: color-mix(in srgb, #9a80e0 45%, var(--line)); }
     .panel { width: 280px; padding: 12px 14px; border-radius: 16px; background: var(--glass);
       backdrop-filter: blur(14px) saturate(1.3); -webkit-backdrop-filter: blur(14px) saturate(1.3);
       border: 1px solid var(--line); box-shadow: 0 16px 40px -12px rgba(50,40,110,.32), 0 2px 6px rgba(0,0,0,.06); font-size: 12px; }
@@ -81,7 +90,7 @@
   let pet = null;
   let petOn = false;
   let expanded = false;
-  let last = { name: 'AI Meter', meters: [], chat: null };
+  let last = { name: 'AI Meter', meters: [], chat: null, problem: null };
   let ticker = null;
 
   const el = (tag, cls, text) => {
@@ -223,6 +232,24 @@
     return box;
   }
 
+  function problemBox(p) {
+    const d = AM.describeProblem(p);
+    const box = el('div', 'problem');
+    box.append(el('b', null, d.title), el('div', 'why', d.detail));
+    if (AM.copyDiagnostics) {
+      const btn = el('button', null, 'Copy debug log');
+      btn.type = 'button';
+      btn.title = 'Copies what AI Meter saw on this page (request addresses and shapes, never message text)';
+      btn.addEventListener('click', async () => {
+        const ok = await AM.copyDiagnostics();
+        btn.textContent = ok ? 'Copied ✓' : 'Copy failed';
+        setTimeout(() => { btn.textContent = 'Copy debug log'; }, 2000);
+      });
+      box.append(btn);
+    }
+    return box;
+  }
+
   function renderPanel(meters, now) {
     panelBox.textContent = '';
     if (!expanded) return;
@@ -231,7 +258,8 @@
     h.append(el('span', null, last.name), el('span', 'muted', 'AI Meter'));
     panel.append(h);
     if (last.chat) panel.append(chatSection(last.chat, now));
-    if (!meters.length) panel.append(el('div', 'empty', 'No usage data yet. Send a message or open usage settings.'));
+    if (last.problem) panel.append(problemBox(last.problem));
+    else if (!meters.length) panel.append(el('div', 'empty', 'No usage data yet. Send a message or open usage settings.'));
     for (const m of meters) {
       const pct = AM.pctOf(m);
       const row = el('div', 'row');
@@ -270,14 +298,19 @@
     const topPct = top ? AM.pctOf(top) : null;
     renderPanel(meters, now);
 
-    dot.className = 'dot ' + AM.level(topPct);
+    dot.className = 'dot ' + (last.problem && !top ? 'warn' : AM.level(topPct));
     info.textContent = '';
     if (!top) {
-      info.append(el('span', null, last.name), el('span', 'muted', '—'));
+      info.append(el('span', null, last.name), el('span', 'muted', last.problem ? AM.describeProblem(last.problem).pill : '—'));
     } else {
       info.append(el('span', null, last.name), el('span', null, topPct != null ? Math.round(topPct) + '%' : AM.meterValue(top)));
       const rt = top.resetAt ? AM.formatDuration(top.resetAt - now) : '';
       if (rt) info.append(el('span', 'muted', '· ' + rt));
+    }
+    if (last.problem && top) {
+      const flag = el('span', 'warn-flag', '!');
+      flag.title = AM.describeProblem(last.problem).title;
+      info.append(flag);
     }
     if (last.chat) {
       info.append(el('span', 'sep'), el('span', null, AM.fmtTokens(last.chat.tokens) + ' tok'));
@@ -295,13 +328,13 @@
   AM.widget = {
     destroy: unmount,
     get pet() { return pet; }, // for debugging from the console: AIMeter.widget.pet.play('yarn')
-    update(name, meters, settings, chat) {
+    update(name, meters, settings, chat, problem) {
       if (AM.dead) return;
-      last = { name, meters, chat: chat || null };
+      last = { name, meters, chat: chat || null, problem: problem || null };
       if (!settings.widget) return unmount();
       if (!host) {
         if (!document.body) {
-          document.addEventListener('DOMContentLoaded', () => AM.widget.update(name, last.meters, settings, last.chat), { once: true });
+          document.addEventListener('DOMContentLoaded', () => AM.widget.update(name, last.meters, settings, last.chat, last.problem), { once: true });
           return;
         }
         mount();

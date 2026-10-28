@@ -59,7 +59,10 @@
       this.est.refresh();
       const page = this.p.at && this.p.bl && this.p.fSid ? {} : this.fromPage();
       const p = { ...page, ...this.p };
-      if (!p.at || !p.bl || !p.fSid) return this.ctx.log('Gemini replay params missing (at/bl/f.sid)');
+      if (!p.at || !p.bl || !p.fSid) {
+        this.ctx.log('Gemini replay params missing (at/bl/f.sid)');
+        return this.ctx.problem('error', "The page's request parameters were not available");
+      }
       const authuser = (location.pathname.match(/^\/u\/(\d+)/) || [])[1] || '0';
       const prefix = authuser === '0' ? '' : `/u/${authuser}`;
       const url = new URL(`${location.origin}${prefix}/_/BardChatUi/data/batchexecute`);
@@ -85,6 +88,7 @@
         this.parse(await r.text());
       } catch (e) {
         this.ctx.log('Gemini usage RPC failed:', e.message);
+        this.ctx.problem('error', 'Usage request failed: ' + AM.errText(e));
       }
     },
 
@@ -92,7 +96,7 @@
       const { meters, error } = AM.parseGeminiUsage(text);
       this.ctx.log('Gemini usage parsed:', meters.length ? meters.map((m) => `${m.label} raw=${m.raw} -> ${m.pct}%`).join(', ') : error);
       if (meters.length) this.ctx.report('real', meters);
-      else this.ctx.log('Gemini usage parse:', error);
+      else { this.ctx.log('Gemini usage parse:', error); this.ctx.problem('error', 'Could not read usage from the response (' + error + ')'); }
     },
   });
 })();

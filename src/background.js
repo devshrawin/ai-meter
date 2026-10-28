@@ -53,7 +53,7 @@ async function checkThresholds(entry, settings) {
 chrome.runtime.onMessage.addListener((msg, sender) => {
   if (!msg || msg.type !== 'aimeter:usage') return;
   (async () => {
-    const entry = { provider: msg.provider, name: msg.name, meters: msg.meters || [], updatedAt: Date.now() };
+    const entry = { provider: msg.provider, name: msg.name, meters: msg.meters || [], problem: msg.problem || null, updatedAt: Date.now() };
     await chrome.storage.local.set({ ['usage.' + msg.provider]: entry });
     if (sender.tab && sender.tab.id != null) setBadge(sender.tab.id, entry.meters);
     const settings = await getSettings();

@@ -202,4 +202,36 @@
   };
 
   AM.sortMeters = (meters) => (meters || []).slice().sort((a, b) => AM.windowHours(a) - AM.windowHours(b));
+
+  // ---- "can't read usage here" ----
+  // An adapter reports a problem when its usage call fails or its parser finds nothing. Transient errors
+  // (the page hasn't made its own calls yet) must not flash a warning, so an 'error' only shows once it has
+  // lasted PROBLEM_DELAY_MS; a definite 'signin' (signed out) shows at once.
+  AM.PROBLEM_DELAY_MS = 15000;
+  AM.problemVisible = (p, now = Date.now()) => !!p && (p.kind === 'signin' || now - (p.since || 0) >= AM.PROBLEM_DELAY_MS);
+  // Only warn when nothing real is being shown: real numbers from the provider mean the usage path works.
+  AM.problemToShow = (problem, meters, now = Date.now()) =>
+    AM.problemVisible(problem, now) && !(meters || []).some((m) => m.source === 'real') ? problem : null;
+  AM.describeProblem = (p) => (p && p.kind === 'signin'
+    ? { title: 'Sign in to see limits', pill: 'sign in', detail: p.text || 'You are not signed in here, so the site has no limits to show.' }
+    : { title: "Can't read usage here", pill: "can't read usage", detail: p && p.text ? String(p.text).slice(0, 160) : 'The site did not return usage in a form AI Meter understands.' });
+  // "HTTP 401" from an error thrown by ctx.getJSON ("401 /path...") without leaking the path (it can hold ids).
+  AM.errText = (e) => {
+    const m = String((e && e.message) || e || '').match(/^(\d{3})\b/);
+    return m ? 'HTTP ' + m[1] : String((e && e.message) || e || 'request failed').slice(0, 100);
+  };
+  AM.errIsAuth = (e) => /^40[13]\b/.test(String((e && e.message) || ''));
+
+  // Text for the "Copy debug log" button. Shape-only debug entries (never message text); request URLs are included.
+  AM.buildDiagnostics = ({ version, provider, host, problem, meters, log, now = Date.now() }) => {
+    const lines = [`AI Meter ${version || '?'} | ${provider || '?'} | ${host || '?'} | ${new Date(now).toISOString()}`];
+    if (problem) lines.push(`Problem: ${problem.kind}: ${problem.text || ''}`.trim());
+    lines.push('Meters: ' + ((meters || []).map((m) => `${m.label} ${AM.meterValue(m)} [${m.source}]`).join('; ') || 'none'));
+    const entries = (log || []).filter((e) => !provider || e.provider === provider).slice(0, 40);
+    if (!entries.length) lines.push('(No debug entries. Tick Debug in Settings, reload the tab, then copy again for request details.)');
+    for (const e of entries) {
+      lines.push(`${new Date(e.t).toISOString().slice(11, 19)} ${e.kind || ''} ${e.method || ''}${e.status ? ' ' + e.status : ''} ${e.url || ''}${e.body ? ' | ' + String(e.body).slice(0, 300) : ''}`.replace(/\s+/g, ' ').trim());
+    }
+    return lines.join('\n');
+  };
 })();

@@ -24,6 +24,7 @@ function load(fetchImpl) {
     onRequest() {}, onResponse() {}, visible: () => true, debug: () => true,
     log: (...a) => logs.push(a.join(' ')),
     report: (group, meters) => reports.push({ group, meters: JSON.parse(JSON.stringify(meters)) }),
+    problem() {},
   };
   adapter.init(c);
   return { adapter, reports, logs, AM };

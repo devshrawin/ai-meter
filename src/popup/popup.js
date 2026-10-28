@@ -37,7 +37,21 @@ async function render() {
     const h = el('h3', null, entry.name);
     h.append(el('small', null, 'updated ' + ago(entry.updatedAt)));
     card.append(h);
-    if (!entry.meters.length) card.append(el('div', 'none', 'No data yet — send a message.'));
+    const prob = AM.problemToShow(entry.problem, entry.meters);
+    if (prob) {
+      const d = AM.describeProblem(prob);
+      const box = el('div', 'problem');
+      box.append(el('b', null, d.title), el('div', 'why', d.detail));
+      const btn = el('button', null, 'Copy debug log');
+      btn.type = 'button';
+      btn.addEventListener('click', async () => {
+        const text = AM.buildDiagnostics({ version: chrome.runtime.getManifest().version, provider: entry.provider, host: '', problem: prob, meters: entry.meters, log: all['debug.log'] || [] });
+        try { await navigator.clipboard.writeText(text); btn.textContent = 'Copied ✓'; } catch { btn.textContent = 'Copy failed'; }
+        setTimeout(() => { btn.textContent = 'Copy debug log'; }, 2000);
+      });
+      box.append(btn);
+      card.append(box);
+    } else if (!entry.meters.length) card.append(el('div', 'none', 'No data yet — send a message.'));
     for (const m of AM.sortMeters(entry.meters)) {
       const pct = AM.pctOf(m);
       const row = el('div', 'row');

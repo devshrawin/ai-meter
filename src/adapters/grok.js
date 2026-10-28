@@ -71,6 +71,8 @@
 
     // Chat limits per model: remainingQueries / totalQueries over windowSizeSeconds (24h on the free tier).
     async refreshLimits() {
+      let authFails = 0;
+      let httpFails = 0;
       const models = [...new Set(['grok-4', 'grok-3'].concat(this.lastModel && /^grok-[\w.-]+$/.test(this.lastModel) ? [this.lastModel] : []))];
       const out = [];
       for (const modelName of models) {
@@ -81,7 +83,11 @@
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ requestKind: 'DEFAULT', modelName }),
           });
-          if (!r.ok) { this.ctx.log('Grok rate-limits', modelName, 'HTTP', r.status); continue; }
+          if (!r.ok) {
+            this.ctx.log('Grok rate-limits', modelName, 'HTTP', r.status);
+            if (r.status === 401 || r.status === 403) authFails++; else httpFails++;
+            continue;
+          }
           const j = await r.json();
           if (!(typeof j.totalQueries === 'number' && j.totalQueries > 0 && typeof j.remainingQueries === 'number')) continue;
           const hours = j.windowSizeSeconds ? Math.round(j.windowSizeSeconds / 3600) : null;
@@ -99,9 +105,12 @@
           });
         } catch (e) {
           this.ctx.log('Grok rate-limits', modelName, 'failed:', e.message);
+          httpFails++;
         }
       }
       if (out.length) { this.limits = out; this.publish(); }
+      else if (authFails === models.length) this.ctx.problem('signin', 'Sign in to Grok to see your remaining queries.');
+      else this.ctx.problem('error', httpFails ? 'The limits request failed' : 'The limits response had no query counters');
     },
 
     publish() {
