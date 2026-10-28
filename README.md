@@ -83,11 +83,22 @@ Settings → **Other AI sites** → enter the hostname (e.g. `chat.example.com`)
 
 ## Privacy
 
+The full policy is in [`docs/privacy.md`](docs/privacy.md). The short version:
+
+
 - Everything stays in `chrome.storage.local` on your machine. No servers, no analytics.
 - A page-world script mirrors network calls to the extension so it can spot sends and usage responses. Adapters only extract the **model name**; prompt text is never stored.
 - Auth/session responses are never forwarded. Tokens needed for a usage call (ChatGPT, Kimi) stay in memory and are sent only back to that provider's own domain.
 - The debug log stores request bodies as key names only, full response bodies only for usage/limit endpoints, and just the JSON *shape* (keys and types) of anything else.
 - Usage requests are made from your own logged-in tab, to the provider's own domain, exactly as the site's settings page would.
+
+## Not affiliated
+
+AI Meter is an independent project. It is not affiliated with, endorsed by or sponsored by Anthropic, OpenAI, Google, xAI, Perplexity, Moonshot AI, DeepSeek, Alibaba, Mistral AI, Microsoft, Meta or Quora. Claude, ChatGPT, Gemini, Grok, Perplexity, Kimi, DeepSeek, Qwen, Le Chat, Copilot, Meta AI and Poe, and all related names and logos, are trademarks of their respective owners. They are used here only to identify the services AI Meter works with.
+
+## Store listing
+
+The Chrome Web Store copy, permission justifications and screenshot list are in [`docs/store/listing.md`](docs/store/listing.md).
 
 ## Debugging endpoints
 
