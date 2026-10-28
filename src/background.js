@@ -50,7 +50,15 @@ async function checkThresholds(entry, settings) {
   if (changed) await chrome.storage.local.set({ notified });
 }
 
-chrome.runtime.onMessage.addListener((msg, sender) => {
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg && msg.type === 'aimeter:loadPet') {
+    // Inject Iris's engine and frames into the asking frame's content-script world (the same one widget.js runs in).
+    if (!sender.tab || sender.tab.id == null) { sendResponse({ ok: false, error: 'no tab' }); return; }
+    chrome.scripting.executeScript({ target: { tabId: sender.tab.id, frameIds: [sender.frameId || 0] }, files: AM.PET_BUNDLE })
+      .then(() => sendResponse({ ok: true }))
+      .catch((e) => sendResponse({ ok: false, error: String((e && e.message) || e) }));
+    return true; // async response
+  }
   if (!msg || msg.type !== 'aimeter:usage') return;
   (async () => {
     const entry = { provider: msg.provider, name: msg.name, meters: msg.meters || [], problem: msg.problem || null, updatedAt: Date.now() };

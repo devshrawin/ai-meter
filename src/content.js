@@ -102,6 +102,16 @@
     send({ type: 'aimeter:usage', provider: adapter.id, name: adapter.name, meters, problem: shown });
   }
 
+  // Iris's code is not in the always-loaded bundle: the background script injects it into this tab on request.
+  AM.loadPet = () => new Promise((resolve, reject) => {
+    try {
+      chrome.runtime.sendMessage({ type: 'aimeter:loadPet' }, (r) => {
+        if (chrome.runtime.lastError || !r || !r.ok) reject(new Error((r && r.error) || 'could not load Iris'));
+        else resolve();
+      });
+    } catch (e) { reject(e); }
+  });
+
   // "Copy debug log": diagnostics for the current provider, from this tab's state plus the stored debug log.
   AM.copyDiagnostics = async () => {
     let log = [];
@@ -147,14 +157,34 @@
     }
   }
 
+  // Private channel to the page-world hook (inject.js). Not window.postMessage: that is readable and forgeable by
+  // every script on the page. We hand inject.js one end of a MessageChannel in a 'hello'; only it (it listens first
+  // and swallows the event) holds the other end, so a page script cannot post here. Each message is validated.
+  let port = null;
+  let helloTries = 0;
+  function connect() {
+    if (port || AM.dead || helloTries >= 6) return;
+    helloTries++;
+    const ch = new MessageChannel();
+    ch.port1.onmessage = (e) => {
+      if (AM.dead) return;
+      const d = AM.validateInjectMessage(e.data);
+      if (!d) return;
+      if (!port) { port = ch.port1; checkHook(); } // first valid message from inject.js: the channel is live
+      if (adapter) handle(d);
+      else if (pending.length < 200) pending.push(d);
+    };
+    window.postMessage({ source: 'aimeter-content', kind: 'hello' }, location.origin, [ch.port2]);
+    setTimeout(connect, 1500); // no answer yet (inject.js may start later): try again with a fresh channel
+  }
+  // inject.js announces itself when it starts, in case we sent our hello before it was listening.
   window.addEventListener('message', (e) => {
-    if (AM.dead || e.source !== window || !e.data || e.data.source !== 'aimeter-inject') return;
-    if (adapter) handle(e.data);
-    else if (pending.length < 200) pending.push(e.data);
+    if (!port && e.source === window && e.data && e.data.source === 'aimeter-inject' && e.data.kind === 'ready') connect();
   });
+  connect();
 
   function checkHook() {
-    window.postMessage({ source: 'aimeter-content', kind: 'ping', debug: !!settings.debug }, location.origin);
+    if (port) port.postMessage({ kind: 'ping', debug: !!settings.debug });
     setTimeout(() => {
       if (!injectOk) dlog({ kind: 'status', url: host, body: 'network hook NOT active — request/response capture unavailable on this page' });
     }, 3000);

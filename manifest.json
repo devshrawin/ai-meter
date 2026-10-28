@@ -108,9 +108,6 @@
         "src/core/store.js",
         "src/core/banner.js",
         "src/core/perches.js",
-        "src/core/iris-frames.js",
-        "src/core/walk8-frames.js",
-        "src/core/pet.js",
         "src/core/widget.js",
         "src/core/chatdom.js",
         "src/adapters/claude.js",
@@ -131,7 +128,24 @@
         "src/assets/iris/*.webp"
       ],
       "matches": [
-        "https://*/*"
+        "https://claude.ai/*",
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://gemini.google.com/*",
+        "https://grok.com/*",
+        "https://www.perplexity.ai/*",
+        "https://perplexity.ai/*",
+        "https://www.kimi.com/*",
+        "https://kimi.com/*",
+        "https://chat.deepseek.com/*",
+        "https://chat.qwen.ai/*",
+        "https://chat.mistral.ai/*",
+        "https://copilot.microsoft.com/*",
+        "https://copilot.com/*",
+        "https://www.copilot.com/*",
+        "https://www.meta.ai/*",
+        "https://meta.ai/*",
+        "https://poe.com/*"
       ],
       "use_dynamic_url": true
     }

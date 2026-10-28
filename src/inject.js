@@ -15,9 +15,35 @@
   const MAX_RES = 200000;
   let captureAll = false;
 
+  // The extension and this script talk over a MessageChannel, not window.postMessage: anything posted on the
+  // window can be read, and forged, by every script on the page. The content script transfers one end of a
+  // private channel in a 'hello' message; this listener is registered first (document_start, capture phase) and
+  // swallows that event so page scripts never see the port. Until it arrives, messages wait in a short queue.
+  let port = null;
+  const queue = [];
   const post = (d) => {
-    try { window.postMessage({ source: TAG, ...d }, location.origin); } catch {}
+    try {
+      if (port) port.postMessage(d);
+      else if (queue.length < 200) queue.push(d);
+    } catch {}
   };
+  const onPing = (m) => {
+    const d = m && m.data;
+    if (!d || d.kind !== 'ping') return;
+    captureAll = !!d.debug;
+    post({ kind: 'pong', fetchHooked: window.fetch === ourFetch });
+  };
+  window.addEventListener('message', (e) => {
+    if (e.source !== window || !e.data || e.data.source !== 'aimeter-content' || e.data.kind !== 'hello') return;
+    e.stopImmediatePropagation(); // never let a page script see (or steal) the port
+    if (port || e.origin !== location.origin || !e.ports || !e.ports[0]) return;
+    port = e.ports[0];
+    port.onmessage = onPing;
+    queue.splice(0).forEach((d) => { try { port.postMessage(d); } catch {} });
+    post({ kind: 'pong', fetchHooked: window.fetch === ourFetch });
+  }, true);
+  // Tells a content script that started first that it can send its hello now (carries no secret).
+  try { window.postMessage({ source: TAG, kind: 'ready' }, location.origin); } catch {}
   const abs = (u) => {
     try { return new URL(String(u), location.href).href; } catch { return String(u); }
   };
@@ -91,8 +117,10 @@
       }
       if (init && init.method) method = init.method;
       method = method.toUpperCase();
-      body = bodyText(init && init.body);
-      if (body == null && input instanceof Request && method !== 'GET' && method !== 'HEAD') {
+      // Sign-in, session, token, account and profile calls: forward that a request happened, never its body.
+      const priv = PRIVATE.test(url);
+      body = priv ? null : bodyText(init && init.body);
+      if (!priv && body == null && input instanceof Request && method !== 'GET' && method !== 'HEAD') {
         input.clone().text()
           .then((t) => post({ kind: 'request', url, method, body: t.slice(0, MAX_REQ) }))
           .catch(() => post({ kind: 'request', url, method, body: null }));
@@ -119,12 +147,6 @@
     }
   }, 2000);
 
-  window.addEventListener('message', (e) => {
-    if (e.source !== window || !e.data || e.data.source !== 'aimeter-content' || e.data.kind !== 'ping') return;
-    captureAll = !!e.data.debug;
-    post({ kind: 'pong', fetchHooked: window.fetch === ourFetch });
-  });
-
   const XO = XMLHttpRequest.prototype.open;
   const XS = XMLHttpRequest.prototype.send;
   XMLHttpRequest.prototype.open = function (method, url) {
@@ -134,7 +156,7 @@
   XMLHttpRequest.prototype.send = function (b) {
     const info = this.__aimeter;
     if (info) {
-      const body = bodyText(b);
+      const body = PRIVATE.test(info.url) ? null : bodyText(b);
       post({ kind: 'request', ...info, body });
       this.addEventListener('load', () => {
         try {
@@ -158,7 +180,7 @@
   const WSS = WebSocket.prototype.send;
   WebSocket.prototype.send = function (data) {
     try {
-      if (typeof data === 'string' && data.length > 40) post({ kind: 'request', url: this.url, method: 'WS', body: data.slice(0, MAX_REQ) });
+      if (typeof data === 'string' && data.length > 40) post({ kind: 'request', url: this.url, method: 'WS', body: PRIVATE.test(this.url) ? null : data.slice(0, MAX_REQ) });
     } catch {}
     return WSS.apply(this, arguments);
   };

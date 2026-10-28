@@ -88,8 +88,9 @@ The full policy is in [`docs/privacy.md`](docs/privacy.md). The short version:
 
 - Everything stays in `chrome.storage.local` on your machine. No servers, no analytics.
 - A page-world script mirrors network calls to the extension so it can spot sends and usage responses. Adapters only extract the **model name**; prompt text is never stored.
-- Auth/session responses are never forwarded. Tokens needed for a usage call (ChatGPT, Kimi) stay in memory and are sent only back to that provider's own domain.
+- The page-world script talks to the extension over a private `MessageChannel` (not `window.postMessage`, which every script on the page can read and forge), and every message is schema-validated. The bodies of sign-in, session, token, account and profile requests and responses are never forwarded. Tokens needed for a usage call (ChatGPT, Kimi) stay in memory and are sent only back to that provider's own domain.
 - The debug log stores request bodies as key names only, full response bodies only for usage/limit endpoints, and just the JSON *shape* (keys and types) of anything else.
+- Iris's code and sprites load into a tab only when she is switched on, and the sprites are web-accessible to the provider sites only (sites you add yourself get the meter without her).
 - Usage requests are made from your own logged-in tab, to the provider's own domain, exactly as the site's settings page would.
 
 ## Not affiliated

@@ -78,7 +78,7 @@
     .iris-face { width: 22px; height: 22px; object-fit: cover; object-position: 50% 12%; border-radius: 50%;
       background: #fff; border: 1px solid var(--line); transition: filter .2s, opacity .2s; }
     .iris-btn.away .iris-face { filter: grayscale(1); opacity: .6; }
-  ` + AM.PET_CSS;
+  `;
 
   let host = null;
   let root = null;
@@ -89,6 +89,10 @@
   let dot = null;
   let pet = null;
   let petOn = false;
+  let petPending = false;
+  let petCssAdded = false;
+  let styleEl = null;
+  let lastSettings = {};
   let expanded = false;
   let last = { name: 'AI Meter', meters: [], chat: null, problem: null };
   let ticker = null;
@@ -109,8 +113,28 @@
 
   const moodFor = (pct) => (pct == null || pct < 75 ? 'happy' : pct < 90 ? 'worried' : pct < 100 ? 'stressed' : 'sleep');
 
+  // Iris's engine and sprites are loaded into the tab only when she is switched on, and only on the built-in sites
+  // (the sprites are web-accessible to those hosts alone; a site added in Settings gets the meter without her).
+  const irisAvailable = () => !AM.siteId || !String(AM.siteId).startsWith('site:');
+  let petLoad = null;
+  function ensurePet() {
+    if (AM.createPet) return Promise.resolve(true);
+    if (!petLoad) {
+      petLoad = (AM.loadPet ? AM.loadPet() : Promise.reject(new Error('no loader')))
+        .then(() => !!AM.createPet, () => false)
+        .then((ok) => { if (!ok) petLoad = null; return ok; });
+    }
+    return petLoad;
+  }
+  function applyPetSettings() {
+    if (!pet) return;
+    pet.setExplore(lastSettings.explore !== false);
+    if (pet.setEnergy) pet.setEnergy(lastSettings.irisEnergy);
+  }
+
   function setPet(on) {
-    if (on === petOn && (!on || pet)) return;
+    if (on && !irisAvailable()) on = false;
+    if (on === petOn && (!on || pet || petPending)) return;
     petOn = on;
     const old = pet;
     pet = null;
@@ -123,7 +147,16 @@
     }
     if (on) {
       wrap.classList.add('with-pet');
-      pet = AM.createPet(pill, host);
+      petPending = true;
+      ensurePet().then((ok) => {
+        petPending = false;
+        if (!petOn || pet || !host || !wrap) return;
+        if (!ok) { petOn = false; wrap.classList.remove('with-pet'); return; }
+        if (!petCssAdded && AM.PET_CSS && styleEl) { styleEl.textContent += AM.PET_CSS; petCssAdded = true; }
+        pet = AM.createPet(pill, host);
+        applyPetSettings();
+        render();
+      });
     }
   }
 
@@ -136,6 +169,7 @@
     root = host.attachShadow({ mode: 'open' });
     const style = el('style');
     style.textContent = CSS;
+    styleEl = style;
     wrap = el('div', 'wrap');
     panelBox = el('div');
     pill = el('div', 'pill');
@@ -274,7 +308,7 @@
       row.append(t, bar, sub);
       panel.append(row);
     }
-    if (AM.setSetting) {
+    if (AM.setSetting && irisAvailable()) {
       const foot = el('div', 'foot');
       const btn = el('button', 'iris-btn' + (petOn ? '' : ' away'));
       btn.type = 'button';
@@ -341,11 +375,9 @@
       } else if (!host.isConnected && document.body) {
         document.body.appendChild(host);
       }
+      lastSettings = settings;
       setPet(settings.pet !== false);
-      if (pet) {
-        pet.setExplore(settings.explore !== false);
-        if (pet.setEnergy) pet.setEnergy(settings.irisEnergy);
-      }
+      applyPetSettings();
       render();
     },
   };

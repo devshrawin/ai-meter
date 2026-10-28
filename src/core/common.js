@@ -203,6 +203,34 @@
 
   AM.sortMeters = (meters) => (meters || []).slice().sort((a, b) => AM.windowHours(a) - AM.windowHours(b));
 
+  // ---- messages from the page-world hook ----
+  // Everything arriving from inject.js is untrusted input (it was produced inside the page's own JS world). Only
+  // well-formed messages with the expected field types and sizes get through, rebuilt field by field.
+  AM.validateInjectMessage = (d) => {
+    if (!d || typeof d !== 'object' || Array.isArray(d)) return null;
+    const str = (v, max) => typeof v === 'string' && v.length <= max;
+    const opt = (v, max) => v == null || str(v, max);
+    const url = (v) => str(v, 4000) && /^(https?|wss?):\/\//i.test(v);
+    switch (d.kind) {
+      case 'pong':
+        return typeof d.fetchHooked === 'boolean' ? { kind: 'pong', fetchHooked: d.fetchHooked } : null;
+      case 'request':
+        if (!url(d.url) || !str(d.method, 12) || !opt(d.body, 20000)) return null;
+        return { kind: 'request', url: d.url, method: d.method, body: d.body == null ? null : d.body };
+      case 'response':
+        if (!url(d.url) || !str(d.method, 12) || !Number.isInteger(d.status) || d.status < 100 || d.status > 599) return null;
+        if (!opt(d.reqBody, 20000) || !opt(d.retryAfter, 64) || !opt(d.body, 270000)) return null;
+        if ((d.binary != null && typeof d.binary !== 'boolean') || (d.shapeOnly != null && typeof d.shapeOnly !== 'boolean')) return null;
+        return {
+          kind: 'response', url: d.url, method: d.method, status: d.status,
+          reqBody: d.reqBody == null ? null : d.reqBody, retryAfter: d.retryAfter == null ? null : d.retryAfter,
+          binary: !!d.binary, shapeOnly: !!d.shapeOnly, body: d.body == null ? '' : d.body,
+        };
+      default:
+        return null;
+    }
+  };
+
   // ---- "can't read usage here" ----
   // An adapter reports a problem when its usage call fails or its parser finds nothing. Transient errors
   // (the page hasn't made its own calls yet) must not flash a warning, so an 'error' only shows once it has

@@ -27,9 +27,6 @@
     'src/core/store.js',
     'src/core/banner.js',
     'src/core/perches.js',
-    'src/core/iris-frames.js',
-    'src/core/walk8-frames.js',
-    'src/core/pet.js',
     'src/core/widget.js',
     'src/core/chatdom.js',
     'src/adapters/claude.js',
@@ -40,6 +37,13 @@
     'src/adapters/kimi.js',
     'src/adapters/generic.js',
     'src/content.js',
+  ];
+
+  // Iris's engine and frames: injected into a tab only when she is switched on (see widget.js / background.js).
+  AM.PET_BUNDLE = [
+    'src/core/iris-frames.js',
+    'src/core/walk8-frames.js',
+    'src/core/pet.js',
   ];
 
   AM.siteScripts = (host) => {
