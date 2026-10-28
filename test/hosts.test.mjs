@@ -55,3 +55,15 @@ test('the widget loads and works without the pet engine present', () => {
   assert.equal(typeof c.AIMeter.widget.update, 'function');
   assert.equal(c.AIMeter.createPet, undefined, 'no pet until it is requested');
 });
+
+test('every file the manifest points at exists (icons, popup, options, background, content scripts)', () => {
+  const files = new Set([
+    manifest.background.service_worker, manifest.action.default_popup, manifest.options_page,
+    ...Object.values(manifest.icons), ...Object.values(manifest.action.default_icon),
+    ...manifest.content_scripts.flatMap((c) => c.js),
+  ]);
+  for (const f of files) assert.ok(existsSync(new URL('../' + f, import.meta.url)), `${f} is missing`);
+  // the sprite glob must match real files
+  assert.ok(manifest.web_accessible_resources.some((r) => r.resources.some((g) => g.startsWith('src/assets/iris/'))));
+  assert.ok(existsSync(new URL('../src/assets/iris/sit.webp', import.meta.url)));
+});
