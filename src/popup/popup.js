@@ -1,7 +1,6 @@
 const AM = globalThis.AIMeter;
 const list = document.getElementById('list');
 const summary = document.getElementById('summary');
-const CHIPS_SHOWN = 4;
 
 const el = (tag, cls, text) => {
   const e = document.createElement(tag);
@@ -66,41 +65,63 @@ function problemBox(entry, prob, all) {
   return box;
 }
 
+// The one-line version of a card: the limit closest to full (or the main counter), as a label, a value and a mini bar.
+function headline(entry, prob, stale) {
+  if (prob) return { text: AM.describeProblem(prob).title, pct: null };
+  if (!entry.meters.length) return { text: 'No data yet', pct: null };
+  const { bars } = AM.splitMeters(entry.meters);
+  const worst = bars.slice().sort((x, y) => AM.pctOf(y) - AM.pctOf(x))[0];
+  const m = worst || AM.primaryMeter(entry.meters);
+  const pct = worst ? AM.pctOf(worst) : null;
+  return { text: `${m.label} ${worst ? Math.round(pct) + '%' : AM.meterValue(m)}`, pct };
+}
+
+const openCards = new Set();
+
 function card(entry, all, now) {
   const stale = AM.isStale(entry, now);
-  const c = el('section', 'card' + (stale ? ' stale' : ''));
+  const c = el('details', 'card' + (stale ? ' stale' : ''));
+  c.open = openCards.has(entry.provider);
+  c.addEventListener('toggle', () => { if (c.open) openCards.add(entry.provider); else openCards.delete(entry.provider); });
   const prob = AM.problemToShow(entry.problem, entry.meters);
   const primary = AM.primaryMeter(entry.meters);
-  const head = el('div', 'card-head');
+  const head = el('summary', 'card-head');
   head.append(el('span', 'led ' + (prob || stale ? 'none' : AM.level(primary ? AM.pctOf(primary) : null))), el('h2', null, entry.name));
-  const src = AM.cardSource(entry.meters);
-  if (src === 'real' || src === 'estimate') head.append(el('i', 'tag ' + src, src === 'real' ? 'real' : 'est'));
-  head.append(el('small', stale ? 'old' : null, (stale ? 'stale · ' : '') + ago(entry.updatedAt)));
+  const h = headline(entry, prob, stale);
+  head.append(el('span', 'line', h.text));
+  if (h.pct != null) {
+    const bar = el('span', 'mini');
+    const fill = el('i', 'fill ' + AM.level(h.pct));
+    fill.style.width = Math.min(100, h.pct) + '%';
+    bar.append(fill);
+    head.append(bar);
+  }
+  head.append(el('span', 'chev'));
   c.append(head);
 
-  if (prob) c.append(problemBox(entry, prob, all));
-  else if (!entry.meters.length) c.append(el('div', 'none', 'No data yet — send a message.'));
+  const body = el('div', 'body');
+  const src = AM.cardSource(entry.meters);
+  const meta = el('div', 'meta');
+  if (src === 'real' || src === 'estimate') meta.append(el('i', 'tag ' + src, src === 'real' ? 'real' : 'est'));
+  meta.append(el('span', stale ? 'old' : null, (stale ? 'stale · ' : '') + 'updated ' + ago(entry.updatedAt)));
+  body.append(meta);
+
+  if (prob) body.append(problemBox(entry, prob, all));
+  else if (!entry.meters.length) body.append(el('div', 'none', 'No data yet — send a message.'));
 
   const { bars, counters } = AM.splitMeters(entry.meters);
   const mixed = src === 'mixed';
   if (bars.length) {
     const wrap = el('div', 'bars');
     for (const m of bars) wrap.append(barRow(m, now, mixed));
-    c.append(wrap);
+    body.append(wrap);
   }
   if (counters.length) {
     const grid = el('div', 'chips');
-    for (const m of counters.slice(0, CHIPS_SHOWN)) grid.append(chip(m, now, mixed));
-    c.append(grid);
-    if (counters.length > CHIPS_SHOWN) {
-      const more = el('details', 'more');
-      more.append(el('summary', null, `Show all ${counters.length} limits`));
-      const rest = el('div', 'chips');
-      for (const m of counters.slice(CHIPS_SHOWN)) rest.append(chip(m, now, mixed));
-      more.append(rest);
-      c.append(more);
-    }
+    for (const m of counters) grid.append(chip(m, now, mixed));
+    body.append(grid);
   }
+  c.append(body);
   return c;
 }
 

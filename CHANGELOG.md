@@ -2,6 +2,11 @@
 
 All notable changes to AI Meter. Versions follow `manifest.json`.
 
+## 0.9.2 — 2026-10-28
+
+### Changed
+- **Popup is one line per service.** Each shows its status LED, name, and the limit closest to full with a mini bar; click to expand the full bars, counters and reset times. Cards you opened stay open across refreshes.
+
 ## 0.9.1 — 2026-10-28
 
 ### Changed

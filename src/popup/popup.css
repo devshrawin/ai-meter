@@ -52,12 +52,22 @@ main { display: flex; flex-direction: column; gap: 10px; padding: 4px 12px 10px;
   background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; box-shadow: var(--shadow);
 }
 .card.stale { opacity: .72; }
-.card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.card { padding: 0; }
+.card-head { display: flex; align-items: center; gap: 8px; padding: 11px 14px; cursor: pointer; list-style: none; }
+.card-head::-webkit-details-marker { display: none; }
+.card-head .line { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.mini .fill { display: block; }
+.mini { width: 40px; height: 5px; border-radius: 99px; background: var(--track); overflow: hidden; flex: none; }
+.chev { width: 7px; height: 7px; margin: 0 2px 2px 4px; border: solid var(--muted); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); transition: transform .15s; flex: none; }
+.card[open] .chev { transform: rotate(-135deg); margin-bottom: -2px; transition: none; }
+.body { padding: 0 14px 12px; }
+.meta { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; color: var(--muted); font-size: 11px; }
+.meta .old { color: var(--mid); }
 .led { width: 8px; height: 8px; border-radius: 50%; background: var(--none); flex: none; }
 .led.low { background: var(--low); box-shadow: 0 0 6px color-mix(in srgb, var(--low) 60%, transparent); }
 .led.mid { background: var(--mid); box-shadow: 0 0 6px color-mix(in srgb, var(--mid) 60%, transparent); }
 .led.high { background: var(--high); box-shadow: 0 0 6px color-mix(in srgb, var(--high) 60%, transparent); }
-.card-head h2 { margin: 0; font-size: 13.5px; font-weight: 650; flex: 1; }
+.card-head h2 { margin: 0; font-size: 13.5px; font-weight: 650; flex: 1; min-width: 0; }
 .card-head small { color: var(--muted); font-size: 11px; }
 .card-head small.old { color: var(--mid); }
 
