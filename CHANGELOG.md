@@ -2,12 +2,13 @@
 
 All notable changes to AI Meter. Versions follow `manifest.json`.
 
-## 0.10.0 — 2026-10-31
+## 1.0.0 — 2026-10-31
+
+First store-ready release.
 
 ### Changed
-- **New Iris art.** Redrawn sprite pack: clearer worried/stressed faces, a soft lavender edge so she stands out on white pages, and a smooth 12-frame walk cycle. Fur colour and size are matched across every pose.
-
-## Unreleased (1.0.0)
+- **New Iris art.** Redrawn sprite pack: clearer worried and stressed faces, a soft lavender edge so she stands out on white pages, and a smooth 12-frame walk cycle. Fur colour and size are matched across every pose.
+- Popup is one collapsible line per service (0.9.2) with a lavender look and dark mode (0.9.1).
 
 ### Added
 - **First-run guide.** A short page opens once on install: what AI Meter reads, how to add a site, and what the real / estimate / banner tags mean. It is also linked from Settings.

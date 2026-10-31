@@ -5,7 +5,7 @@ Prepared in Stage 5 (2026-10-31). Everything that can be done from the repo is d
 ## 0. Blockers: do these before you submit
 
 - [ ] **Confirm the real-number claims you can't see in code.** The listing says AI Meter reads real numbers for Perplexity and Kimi (and ChatGPT's Codex usage). Those three have only been checked signed out, not signed in (`README.md`, "Verified live" says no). Either (a) load the unpacked extension in your Chrome, sign in, and check the pill against each site's own usage page, or (b) delete those lines from the long description in `docs/store/listing.md` so the store text only claims what is verified. Claude, Gemini and Grok are verified.
-- [ ] **Try the exact build.** `chrome://extensions` → Developer mode → Load unpacked → pick the `AI Meter` folder (or unzip `dist/store/ai-meter-<version>.zip` and load that folder: it is what the store will get). Open a supported site: pill appears, click opens the panel, Iris moves. Open the toolbar popup and Settings. Remove the extension and load it again: the welcome page should open once.
+- [ ] **Try the exact build.** `chrome://extensions` → Developer mode → Load unpacked → pick the `AI Meter` folder (or unzip `release/<date>/ai-meter-<version>.zip` and load that folder: it is what the store will get). Open a supported site: pill appears, click opens the panel, Iris moves. Open the toolbar popup and Settings. Remove the extension and load it again: the welcome page should open once.
 - [ ] **Try Export / Import** in Settings: export, change a limit, import the file, check the limit came back.
 
 ## 1. One-time setup
@@ -16,7 +16,7 @@ Prepared in Stage 5 (2026-10-31). Everything that can be done from the repo is d
 
 ## 2. Upload
 
-- [ ] Build the zip: `npm run store-zip` (writes `dist/store/ai-meter-<version>.zip`; it refuses to build if something is wrong). Do this **after** Stage 6 bumps the version to 1.0.0.
+- [ ] Build the zip: `npm run store-zip` (writes `release/<date>/ai-meter-<version>.zip`; it refuses to build if something is wrong).
 - [ ] Dev console → **New item** → upload the zip.
 
 ## 3. Store listing tab

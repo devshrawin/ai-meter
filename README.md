@@ -9,7 +9,9 @@ A Chrome extension that shows how much of your usage limit is left on **Claude, 
 1. Clone or download this repo.
 2. Open `chrome://extensions`, turn on **Developer mode**.
 3. Click **Load unpacked** and pick the repo folder (the one with `manifest.json`).
-4. Open any supported site. The meter appears bottom-right; drag it anywhere, click it for details.
+4. A short "how it works" page opens on first install. Open any supported site: the meter appears bottom-right; drag it anywhere (or focus it with Tab and use Shift + arrow keys), click it or press Enter for details.
+
+Also in Settings: **Export / Import settings** (a backup file with your limits, thresholds and Iris options, never usage data) and a link to the first-run guide.
 
 ## How each provider is measured
 
@@ -58,7 +60,7 @@ She pauses in hidden tabs and sits still if you have reduced motion turned on.
 She only stands on top edges. Only her visible sprite takes clicks, so the page stays usable, and dragging the pill calls her home. Where she can stand on each site is in `src/core/perches.js`: selectors verified live on 2026-09-28 (signed out) for ChatGPT, Gemini, Grok, Perplexity, Kimi, Qwen and Meta AI. Other sites use a generic finder that looks for the lowest text box and its styled container.
 
 **Animation engine** (`src/core/pet.js`, rebuilt with Claude Design): one `requestAnimationFrame` clock drives everything.
-- **Walking:** an 8-frame walk cycle (`walk8-*`, registered by `src/core/walk8-frames.js`) advances by distance travelled, so her feet don't skate.
+- **Walking:** a 12-frame walk cycle (files named `walk8-*` for historical reasons, registered by `src/core/walk8-frames.js`) advances by distance travelled, so her feet don't skate.
 - **Springs** give squash, stretch and tilt on every pose change, take-off and landing.
 - **Turns** between front and side views read as a quick squeeze instead of a snap.
 - **Jumps and falls** follow real arcs.
@@ -66,16 +68,8 @@ She only stands on top edges. Only her visible sprite takes clicks, so the page 
 
 Debug knobs: `AIMeter.irisGait = 'walk8' | 'hop' | 'frames'`, `AIMeter.irisTimeScale` (slow motion).
 
-The other poses are 20 sprite frames in `src/assets/iris/`, cut from the reference sheets in `art/source/` by
+The other poses are 16 sprite frames in `src/assets/iris/`. The current art is the October 2026 redesign: three generated sheets, background keyed out, each pose scaled to one cat size and its fur colour matched across all frames. The sprites are committed; `scripts/build-sprites.py` documents the earlier pipeline and does **not** regenerate this art. The animation code only reads frames by name.
 
-```bash
-python scripts/build-sprites.py   # needs Pillow + numpy
-```
-
-The script removes the drawn pill, hearts and motion lines, matches every frame to one scale using
-the pill width, and writes each frame's size and pill-top anchor to `src/core/iris-frames.js`. To
-use cleaner art later, drop in per-pose transparent PNGs and rerun. The animation code only reads
-the frames by name.
 
 ## Adding any AI site
 
@@ -87,6 +81,7 @@ The full policy is in [`docs/privacy.md`](docs/privacy.md). The short version:
 
 
 - Everything stays in `chrome.storage.local` on your machine. No servers, no analytics.
+- Sign-in, password, OAuth, MFA, checkout and payment requests are never read by the page hook, and secret-looking fields are masked in any body it does forward; the debug log masks emails, tokens and ids. Security review: [`docs/security-review-2026-10-31.md`](docs/security-review-2026-10-31.md). Accessibility review: [`docs/a11y-review-2026-10-31.md`](docs/a11y-review-2026-10-31.md).
 - A page-world script mirrors network calls to the extension so it can spot sends and usage responses. Adapters only extract the **model name**; prompt text is never stored.
 - The page-world script talks to the extension over a private `MessageChannel` (not `window.postMessage`, which every script on the page can read and forge), and every message is schema-validated. The bodies of sign-in, session, token, account and profile requests and responses are never forwarded. Tokens needed for a usage call (ChatGPT, Kimi) stay in memory and are sent only back to that provider's own domain.
 - The debug log stores request bodies as key names only, full response bodies only for usage/limit endpoints, and just the JSON *shape* (keys and types) of anything else.
@@ -99,7 +94,7 @@ AI Meter is an independent project. It is not affiliated with, endorsed by or sp
 
 ## Store listing
 
-The Chrome Web Store copy, permission justifications and screenshot list are in [`docs/store/listing.md`](docs/store/listing.md).
+The Chrome Web Store copy, permission justifications and screenshot list are in [`docs/store/listing.md`](docs/store/listing.md). What only the publisher can do to submit it: [`docs/store/submit-checklist.md`](docs/store/submit-checklist.md).
 
 ## Debugging endpoints
 
@@ -130,10 +125,23 @@ src/
     banner.js          watches for the site's own limit notices
     widget.js          on-page meter (shadow DOM)
   adapters/            one file per provider; generic.js = counting sites + user-added sites
-  popup/  options/
-scripts/make-icons.mjs   renders icons/ with no dependencies
-test/                    node:test unit tests for core logic
+  popup/  options/  welcome/   toolbar popup, settings page, first-run guide
+  assets/iris/         Iris sprite pack (webp)
+scripts/make-icons.mjs        renders icons/ with no dependencies
+scripts/build-store-zip.mjs   builds the Web Store zip into release/<date>/ (npm run store-zip)
+tools/                        preview pages for the popup, pill and settings, and the store-image builder
+test/                         node:test suites (settings, background worker, widget, content, Iris engine, hooks, parsers)
+docs/                         privacy policy, store listing and checklist, security and accessibility reviews
 ```
+
+## Development
+
+```bash
+npm test            # node --test, no dependencies to install
+npm run store-zip   # release/<date>/ai-meter-<version>.zip, the file you upload to the Web Store
+```
+
+Bump `manifest.json`, `package.json` and `CHANGELOG.md` together. One dated release folder, one zip.
 
 ## Adding a provider
 
