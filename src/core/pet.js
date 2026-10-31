@@ -12,7 +12,7 @@
   const FRONT = new Set(['sit', 'sit-blink', 'sit-happy', 'sit-worried', 'sit-stressed', 'mew', 'purr', 'groom', 'dazed', 'fall']);
   const REST = new Set(['sit', 'sit-blink', 'sit-happy', 'sit-worried', 'sit-stressed', 'mew', 'purr', 'groom']);
   const WALK = ['walk-1', 'walk-2', 'walk-3', 'walk-4'];
-  const WALK8 = ['walk8-1', 'walk8-2', 'walk8-3', 'walk8-4', 'walk8-5', 'walk8-6', 'walk8-7', 'walk8-8'];
+  const WALK8 = ['walk8-1', 'walk8-2', 'walk8-3', 'walk8-4', 'walk8-5', 'walk8-6', 'walk8-7', 'walk8-8', 'walk8-9', 'walk8-10', 'walk8-11', 'walk8-12'];
   const BOX_W = 48;
   const BOX_H = 66;
   const CANCEL = Symbol('cancel');
@@ -212,9 +212,9 @@
       } else if (walkOn) {
         const C = cycle(), n = C.length, p = ((phase % n) + n) % n, i = Math.floor(p);
         base = C[i]; over = C[(i + 1) % n];
-        overA = smooth(n === 8 ? 0.6 : 0.45, 1, p - i); // short blend into the next pose at the end of each frame
+        overA = smooth(n >= 8 ? 0.6 : 0.45, 1, p - i); // short blend into the next pose at the end of each frame
         // 8-frame art already carries its own body bob; the old 4 frames need it added
-        bob = -(n === 8 ? 0.5 : 1.3) * gaitAmp * (0.5 - 0.5 * Math.cos((Math.PI * phase * 4) / n));
+        bob = -(n >= 8 ? 0.5 : 1.3) * gaitAmp * (0.5 - 0.5 * Math.cos((Math.PI * phase * 4) / n));
         rot.t = 0;
       } else {
         bob *= Math.max(0, 1 - s * 12);
@@ -294,7 +294,7 @@
       const hopping = gait() === 'hop';
       const eight = gait() === 'walk8';
       // px per hop / per walk frame (8-frame cycle ≈ 12 fps calm, ≈ 16 fps stressed)
-      const stride = hurry ? (hopping ? 16 : eight ? 5.5 : 7) : hopping ? (mood === 'stressed' ? 11 : 9) : eight ? (mood === 'stressed' ? 3.2 : 2.35) : mood === 'stressed' ? 4.4 : 3.5;
+      const stride = hurry ? (hopping ? 16 : eight ? 8.25 : 7) : hopping ? (mood === 'stressed' ? 11 : 9) : eight ? (mood === 'stressed' ? 4.8 : 3.5) : mood === 'stressed' ? 4.4 : 3.5;
       await run((s) => {
         const rem = (tx - x) * d;
         if (rem <= 0.2) return true;
