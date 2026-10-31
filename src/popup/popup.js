@@ -152,7 +152,7 @@ async function render() {
   if (!entries.length) {
     summary.textContent = 'Nothing tracked yet';
     const empty = el('div', 'empty');
-    empty.append(el('b', null, 'Open an AI site'), 'Claude, ChatGPT, Gemini, Grok, Perplexity, Kimi, DeepSeek… and AI Meter starts tracking. Add other sites in Settings.');
+    empty.append(el('b', null, 'Open an AI site'), 'Claude, ChatGPT, Gemini, Grok, Perplexity, Kimi, DeepSeek… and Headroom starts tracking. Add other sites in Settings.');
     list.append(empty);
     return;
   }

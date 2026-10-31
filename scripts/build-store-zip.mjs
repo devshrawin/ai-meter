@@ -1,5 +1,5 @@
 // Builds the Chrome Web Store upload zip: manifest.json, src/ and icons/ only, forward-slash paths, no dev files.
-//   npm run store-zip            -> release/<YYYY-MM-DD>/ai-meter-<version>.zip (older dated folders are removed)
+//   npm run store-zip            -> release/<YYYY-MM-DD>/headroom-<version>.zip (older dated folders are removed)
 // Fails (non-zero exit) if the package is not ready: versions disagree, a file the manifest points at is missing,
 // or something that should not ship (tests, docs, maps, dotfiles) would be included.
 import { readFileSync, readdirSync, statSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'node:fs';
@@ -69,7 +69,7 @@ const releaseDir = join(root, 'release');
 mkdirSync(releaseDir, { recursive: true });
 for (const d of readdirSync(releaseDir)) if (d !== day) rmSync(join(releaseDir, d), { recursive: true, force: true });
 mkdirSync(join(releaseDir, day), { recursive: true });
-const out = join(releaseDir, day, `ai-meter-${manifest.version}.zip`);
+const out = join(releaseDir, day, `headroom-${manifest.version}.zip`);
 writeFileSync(out, Buffer.concat([...chunks, cd, end]));
 console.log(`${out}\n${files.length} files, ${(statSync(out).size / 1024).toFixed(0)} KB, version ${manifest.version}`);
 console.log('permissions:', manifest.permissions.join(', '), '| host_permissions:', (manifest.host_permissions || []).length, '| optional:', (manifest.optional_host_permissions || []).join(', '));

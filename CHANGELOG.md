@@ -1,16 +1,18 @@
 # Changelog
 
-All notable changes to AI Meter. Versions follow `manifest.json`.
+All notable changes to Headroom (called AI Meter before 1.0.0). Versions follow `manifest.json`.
 
 ## 1.0.0 — 2026-10-31
 
 First store-ready release.
 
 ### Changed
+- **Renamed from AI Meter to Headroom.** New name in the extension, popup, settings, first-run guide, notifications, privacy policy, store listing and README. Internal identifiers and saved data are unchanged.
 - **New Iris art.** Redrawn sprite pack: clearer worried and stressed faces, a soft lavender edge so she stands out on white pages, and a smooth 12-frame walk cycle. Fur colour and size are matched across every pose.
 - Popup is one collapsible line per service (0.9.2) with a lavender look and dark mode (0.9.1).
 
 ### Added
+- **Bar style (experimental).** Settings → Meter style can show a thin full-width bar along the top or bottom of the page instead of the pill. It fills to your usage, shows the details when you point at it or focus it, and opens the same panel on click. No Iris in this style.
 - **First-run guide.** A short page opens once on install: what AI Meter reads, how to add a site, and what the real / estimate / banner tags mean. It is also linked from Settings.
 - **Export and import settings.** Save your limits, thresholds and Iris options to a file and load them back. A backup holds settings only. Sites you added need Chrome's permission again, so you add them again after importing.
 - `npm run store-zip` builds the Web Store zip and refuses to if something is wrong.

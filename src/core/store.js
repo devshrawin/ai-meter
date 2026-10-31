@@ -119,7 +119,7 @@
 
   AM.estimator = (ctx, provider) => {
     const report = (events) => { if (!AM.dead) ctx.report('estimate', AM.countMeters(events, ctx.quotas())); };
-    const safe = (p) => p.then(report).catch((e) => { if (!isInvalidated(e)) console.warn('[AI Meter]', e); });
+    const safe = (p) => p.then(report).catch((e) => { if (!isInvalidated(e)) console.warn('[Headroom]', e); });
     return {
       record: (model) => { AM.emit('send'); return safe(AM.events.record(provider, model)); },
       relabelLast: (model) => safe(AM.events.relabelLast(provider, model)),

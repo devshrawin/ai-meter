@@ -3,17 +3,25 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AI Meter Settings</title>
+  <title>Headroom Settings</title>
   <link rel="stylesheet" href="options.css">
 </head>
 <body>
   <main>
-    <h1>AI Meter settings</h1>
-    <p class="hint"><a href="../welcome/welcome.html">How AI Meter works</a> · what it reads, what the real / estimate / banner tags mean, and how to add a site.</p>
+    <h1>Headroom settings</h1>
+    <p class="hint"><a href="../welcome/welcome.html">How Headroom works</a> · what it reads, what the real / estimate / banner tags mean, and how to add a site.</p>
 
     <section>
       <h2>General</h2>
       <label class="check"><input type="checkbox" id="widget"> Show on-page meter</label>
+      <label class="check">Meter style
+        <select id="meterStyle">
+          <option value="pill">Pill in the corner, with Iris</option>
+          <option value="bar-top">Thin bar along the top of the page</option>
+          <option value="bar-bottom">Thin bar along the bottom of the page</option>
+        </select>
+      </label>
+      <p class="hint">The bar fills as you use your limit and shows the details when you point at it or focus it. Iris only appears in the pill style. Reload open tabs after changing it if the bar does not appear.</p>
       <label class="check"><input type="checkbox" id="chatStats"> Show chat length, cache timer and next-message cost (Claude, ChatGPT, Gemini)</label>
       <label class="check"><input type="checkbox" id="notify"> Desktop notifications at
         <input type="text" id="thresholds" size="12" aria-label="Notification thresholds in percent, comma separated"> % (comma separated) and on reset</label>
@@ -39,7 +47,7 @@
 
     <section id="other-sites">
       <h2>Other AI sites</h2>
-      <p class="hint">Add any AI chat site that isn't built in. Chrome asks for access to that one site only. AI Meter then
+      <p class="hint">Add any AI chat site that isn't built in. Chrome asks for access to that one site only. Headroom then
         counts your sends there (estimate), and watches for the site's own limit notices and rate-limit errors.</p>
       <div class="save-row">
         <input type="text" id="siteHost" placeholder="chat.example.com" aria-label="Site address, for example chat.example.com" autocomplete="off">
@@ -52,7 +60,7 @@
 
     <section>
       <h2>Estimate rules</h2>
-      <p class="hint">Where a site doesn't publish usage numbers, AI Meter counts your sends locally and compares
+      <p class="hint">Where a site doesn't publish usage numbers, Headroom counts your sends locally and compares
         against these limits. Sites with real numbers only use these as a fallback. Rules are matched top to bottom against the model name; first match wins.
         Limit 0 means "just count". Set these to match your plan.</p>
       <div id="quotas"></div>

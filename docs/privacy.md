@@ -1,21 +1,21 @@
 ---
-title: AI Meter privacy policy
+title: Headroom privacy policy
 permalink: /privacy
 ---
 
-# AI Meter privacy policy
+# Headroom privacy policy
 
-Effective 31 October 2026 · Applies to AI Meter 0.9.0 and later
+Effective 31 October 2026 · Applies to Headroom (called AI Meter before version 1.0.0) 0.9.0 and later
 
-**In one paragraph:** AI Meter runs entirely in your browser. It has no server, no account and no analytics, and it sends nothing to its developer or to any third party. It reads your usage from the AI sites you already use, from your own logged-in tab, and keeps the numbers on your machine. It never stores the text of your messages.
+**In one paragraph:** Headroom runs entirely in your browser. It has no server, no account and no analytics, and it sends nothing to its developer or to any third party. It reads your usage from the AI sites you already use, from your own logged-in tab, and keeps the numbers on your machine. It never stores the text of your messages.
 
-## What AI Meter is
+## What Headroom is
 
-AI Meter is a Chrome extension that shows how much of your usage limit is left on AI chat sites (Claude, ChatGPT, Gemini, Grok, Perplexity, Kimi, DeepSeek, Qwen, Le Chat, Copilot, Meta AI, Poe, and any site you add yourself). It draws a small meter on the page, a toolbar badge and popup, and can show desktop notifications.
+Headroom is a Chrome extension that shows how much of your usage limit is left on AI chat sites (Claude, ChatGPT, Gemini, Grok, Perplexity, Kimi, DeepSeek, Qwen, Le Chat, Copilot, Meta AI, Poe, and any site you add yourself). It draws a small meter on the page, a toolbar badge and popup, and can show desktop notifications.
 
 ## What it reads, and why
 
-| What | Where it comes from | What AI Meter keeps | Leaves your device? |
+| What | Where it comes from | What Headroom keeps | Leaves your device? |
 |---|---|---|---|
 | **Usage and limit figures** (percent used, remaining queries, reset times) | The provider's own usage endpoint, called from your tab; or the same response the site itself already receives | The latest numbers per provider, in `chrome.storage.local` | No |
 | **That a message was sent, and which model** | The page's own network request (the request is observed, not changed) | A timestamp and the model name, to count messages. Never the text | No |
@@ -27,7 +27,7 @@ AI Meter is a Chrome extension that shows how much of your usage limit is left o
 
 ## How the page-world script works
 
-To spot message sends and usage responses, AI Meter injects a small script into the page itself (a "page-world" script, because a normal extension script cannot see the page's own network calls). It wraps `fetch`, `XMLHttpRequest` and `WebSocket.send` and mirrors what it sees to the extension over a private channel inside the page.
+To spot message sends and usage responses, Headroom injects a small script into the page itself (a "page-world" script, because a normal extension script cannot see the page's own network calls). It wraps `fetch`, `XMLHttpRequest` and `WebSocket.send` and mirrors what it sees to the extension over a private channel inside the page.
 
 Being plain about what that means:
 
@@ -40,7 +40,7 @@ Being plain about what that means:
 
 ## Sign-in credentials
 
-AI Meter does not collect your password or ask you to sign in to anything. Two providers need a credential to answer a usage call, and AI Meter uses the one your browser already holds:
+Headroom does not collect your password or ask you to sign in to anything. Two providers need a credential to answer a usage call, and Headroom uses the one your browser already holds:
 
 - **ChatGPT:** the access token from the site's own `/api/auth/session` response is kept **in memory only** and sent only back to `chatgpt.com`, as the site's own usage request would.
 - **Kimi:** the sign-in cookie that the Kimi web app itself reads is kept **in memory only** and sent only back to `kimi.com`.
@@ -50,11 +50,11 @@ These values are never written to storage, never put in the debug log and never 
 
 ## First run
 
-When you first install AI Meter it opens a short "how it works" page. That page is part of the extension and loads nothing from the internet apart from a link to this policy that you can click.
+When you first install Headroom it opens a short "how it works" page. That page is part of the extension and loads nothing from the internet apart from a link to this policy that you can click.
 
 ## Where requests go
 
-Usage requests go from **your tab to the provider's own domain**, the same place the site's settings page would send them. AI Meter makes no request to any server run by its developer or by anyone else, and contains no analytics, advertising or tracking code.
+Usage requests go from **your tab to the provider's own domain**, the same place the site's settings page would send them. Headroom makes no request to any server run by its developer or by anyone else, and contains no analytics, advertising or tracking code.
 
 ## Permissions
 
@@ -69,7 +69,7 @@ Each permission, and why the extension asks for it, is listed in the Chrome Web 
 
 ## Sharing, sale and children
 
-AI Meter does not sell, rent or share any data, because it does not collect any off your device. It is not directed at children.
+Headroom does not sell, rent or share any data, because it does not collect any off your device. It is not directed at children.
 
 ## Changes
 
@@ -81,4 +81,4 @@ Open an issue at <https://github.com/devshrawin/ai-meter/issues>.
 
 ## Not affiliated
 
-AI Meter is an independent project. It is not affiliated with, endorsed by or sponsored by Anthropic, OpenAI, Google, xAI, Perplexity, Moonshot AI, DeepSeek, Alibaba, Mistral AI, Microsoft, Meta or Quora. Claude, ChatGPT, Gemini, Grok, Perplexity, Kimi, DeepSeek, Qwen, Le Chat, Copilot, Meta AI and Poe, and all related names and logos, are trademarks of their respective owners. They are used here only to identify the services AI Meter works with.
+Headroom is an independent project. It is not affiliated with, endorsed by or sponsored by Anthropic, OpenAI, Google, xAI, Perplexity, Moonshot AI, DeepSeek, Alibaba, Mistral AI, Microsoft, Meta or Quora. Claude, ChatGPT, Gemini, Grok, Perplexity, Kimi, DeepSeek, Qwen, Le Chat, Copilot, Meta AI and Poe, and all related names and logos, are trademarks of their respective owners. They are used here only to identify the services Headroom works with.

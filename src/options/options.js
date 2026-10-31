@@ -82,6 +82,7 @@ function readQuotas() {
 
 function renderGeneral() {
   $('widget').checked = settings.widget;
+  $('meterStyle').value = settings.meterStyle;
   $('chatStats').checked = settings.chatStats;
   $('explore').checked = settings.explore;
   $('irisEnergy').value = settings.irisEnergy === 'lively' ? 'lively' : 'calm';
@@ -118,6 +119,7 @@ async function save() {
       chatStats: $('chatStats').checked,
       explore: $('explore').checked,
       irisEnergy: $('irisEnergy').value,
+      meterStyle: $('meterStyle').value,
       notify: $('notify').checked,
       debug: $('debug').checked,
       thresholds: thresholds.length ? thresholds : AM.DEFAULT_SETTINGS.thresholds,
@@ -237,6 +239,7 @@ $('irisHome').addEventListener('click', async () => {
   flash(settings.pet ? 'Iris is back on the meter.' : 'Iris went home. Bring her back any time.');
 });
 $('irisEnergy').addEventListener('change', save);
+$('meterStyle').addEventListener('change', save);
 $('explore').addEventListener('change', save);
 $('defaults').addEventListener('click', async () => {
   settings = { ...AM.mergeSettings(null), customSites: settings.customSites };

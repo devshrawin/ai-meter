@@ -1,6 +1,6 @@
-# Prompt: redesign AI Meter
+# Prompt: redesign Headroom
 
-Paste everything below the line into a design-capable model (Claude Design, ChatGPT, etc.). Attach, from the repo: `dist/a11y-after/*.jpg` (pill, popup, settings today) and `dist/store/shots/*.png` (store images today).
+Paste everything below the line into a design-capable model (Claude Design, ChatGPT, etc.). Attach the files from the zip `headroom-redesign-kit.zip` (see "What you are given" in the prompt).
 
 ---
 
@@ -14,9 +14,22 @@ Who uses it: people who work in AI chat all day (developers, analysts, writers) 
 
 What it never does (the design must not imply otherwise): it has no account, no server, never stores message text, never asks for a password.
 
+## What you are given
+
+The zip `headroom-redesign-kit.zip` holds:
+
+- `reference/pill/`: the on-page meter today, with the panel open, in light and dark (`widget-light-open.jpg`, `widget-dark-open-hot.jpg`). More pill states (calm, worried, stressed, asleep, signed out, cannot read usage) are visible in `reference/store/3-moods.png` and `reference/store/6-problem.png`.
+- `reference/screens/`: the popup (`popup-light.jpg`) and the settings page (`options-light.jpg`) today.
+- `reference/store/`: the six store screenshots (1280x800), the promo tile and the marquee, as they are today.
+- `reference/code/widget.js`: the real source of the on-page meter, including the CSS of the new **bar style** (search for "Bar style"). There is **no picture of the bar style yet**: design it from the description in surface 1b, and use the code to see what exists.
+- `iris/`: the current Iris sprite pack (webp, drawn at 2x; `frames.json` lists each frame's size in CSS pixels and where its feet are). Poses: sit, blink, happy, worried, stressed, mew, purr, groom, dazed, crouch, jump, fall, teeter, stretch, sleep (two frames), and a 12-frame side-view walk cycle.
+
+Read the reference images before designing. Keep what works, fix what does not.
+
 ## Surfaces to redesign (all of them, light and dark)
 
 1. **The pill**, a small draggable capsule fixed bottom-right of any chat page. Shows: status light, provider name, percent used, time to reset, optional chat length and cache timer. Iris sits on top of it. About 28 px tall, must fit on someone else's page without clashing with it. Shadow DOM, so no site CSS reaches it.
+1b. **The bar style (new, experimental, chosen in Settings as "Meter style")**: instead of the pill, a thin full-width bar along the **top or bottom edge** of the page, about 6 px tall, filled from the left to the percentage used, in the usage colour. It must be readable at a glance from the corner of the eye. Pointing at it or focusing it grows it a little and shows a label chip with provider, percent and time to reset; clicking opens the same panel (below the bar at the top, above it at the bottom). It never moves, has no Iris, and must not hide or block the site's own header or composer. Design: the resting bar, the hover label, the open panel, each usage level, the problem and signed-out states, light and dark, and tell me whether 6 px is the right thickness or what you would change.
 2. **The panel** that opens above the pill (280 px wide): a "this chat" block (length, cache, next-message cost), then one row per limit (label, value, bar, reset text, source tag), then a "Send Iris home" button. A **problem box** replaces the rows when usage cannot be read ("Can't read usage here" + a "Copy debug log" button).
 3. **The toolbar popup** (360 px wide): header with avatar, summary line and two icon buttons (refresh, settings); one collapsible line per service (status light, name, the limit closest to full with a mini bar); expanded card shows meta, bars, counter chips; footer legend of the tags and "+ Add site".
 4. **The settings page**: general toggles, Iris options, "Other AI sites" (add a site), estimate rules (a table of editable limits per provider), backup (export and import), debug log.
@@ -28,6 +41,7 @@ What it never does (the design must not imply otherwise): it has no account, no 
 - Usage level: **ok** (under 75%), **close** (75 to 89%), **critical** (90% and over), **empty** (100%), and **unknown** (no number).
 - Source of a number: **real** (from the provider), **estimate** (counted locally from the user's sends), **banner** (the site itself said a limit was hit). These three tags must be unmistakable and not rely on colour alone.
 - States: signed out ("sign in"), cannot read usage (error), stale data (not updated for a day), no data yet, many services at once, a counter with no percentage ("5 left").
+- Bar style: how the three source tags and the problem states show when there is only a thin bar (label chip, panel, or both).
 - Iris: five moods (calm, worried, stressed, asleep, plus happy after a send) and her place on the pill. You may redraw her, or keep the current art and only redesign the UI around her; say which you chose and why.
 
 ## Hard constraints
@@ -37,7 +51,7 @@ What it never does (the design must not imply otherwise): it has no account, no 
 - **Size:** the pill must stay compact; the popup stays 360 px wide; nothing may need a layout above 760 px except the settings page.
 - **Dark mode** follows `prefers-color-scheme`. Design both, do not just invert.
 - **Do not change behaviour, data or permissions.** This is a visual and wording redesign. Keep every control that exists today (list above); you may reorder, regroup or restyle them.
-- **Keep the product name "AI Meter"** in every design. A separate task may rename it later.
+- **The product name is "Headroom"** (it was called AI Meter before). Use it in every design.
 - **Tone:** calm, a little playful through Iris, never alarmist. The look today is "pearl and lavender" (background `#f7f6fc`, text `#1f1d2b`, accent `#9a80e0` and a darker text accent `#6f52c9`, status green `#22c55e`, amber `#f59e0b`, red `#ef4444`). Keep it, evolve it, or replace it, but justify the choice.
 
 ## Deliver
@@ -45,7 +59,7 @@ What it never does (the design must not imply otherwise): it has no account, no 
 1. **Design direction** in 5 sentences: what the product should feel like, what you are keeping, what you are changing and why.
 2. **Design tokens** as a CSS `:root` block for light and dark (colours with contrast ratios stated, radii, spacing, type scale, shadows, motion durations), plus a one-line rule for each of the three source tags.
 3. **Each surface above**, light and dark, as finished HTML + CSS I can drop in (one self-contained file per surface, sample data included), covering the ok, close, critical, empty, signed-out, error, stale, empty-list and many-services states where they apply.
-4. **Pill variants**: collapsed, collapsed with chat stats, with a problem, and the panel open.
+4. **Pill variants**: collapsed, collapsed with chat stats, with a problem, and the panel open. **Bar variants**: top and bottom, resting, hover label, panel open, every usage level.
 5. **Iris placement and moods** on the pill (and, if you redraw her, the sprite brief: poses, grid, background `#FF00FF` for keying, baseline rule).
 6. **Store images** laid out at the exact sizes, with captions.
 7. A short **changes list**: what is different from today, per surface, and what you deliberately left alone.
@@ -55,4 +69,4 @@ What it never does (the design must not imply otherwise): it has no account, no 
 - I can build each surface from what you give me without asking a question.
 - Contrast numbers are shown and they pass.
 - The three source tags and the five usage levels are distinguishable in greyscale.
-- The pill looks at home on a white page, a dark page and a busy page.
+- The pill and the bar look at home on a white page, a dark page and a busy page.

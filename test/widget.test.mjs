@@ -261,3 +261,54 @@ test('a11y: purely decorative bits are hidden from screen readers; the problem b
   w.click();
   assert.equal(w.root.byClass('problem')[0].attrs.role, 'status');
 });
+
+// ---------- bar style ----------
+
+test('bar style: a thin full-width bar along the bottom, filled to the percentage, in the usage colour', () => {
+  const w = loadWidget();
+  w.update('Claude', [real(32, { resetAt: Date.now() + 3 * hour })], { meterStyle: 'bar-bottom' });
+  assert.match(w.host.style.cssText, /left:0;right:0;bottom:0/);
+  const pill = w.pill();
+  assert.ok(pill.classList.contains('bar'));
+  const fill = w.root.byClass('barfill')[0];
+  assert.equal(fill.style.width, '32%');
+  assert.ok(fill.classList.contains('low'));
+  w.update('Claude', [real(95)], { meterStyle: 'bar-bottom' });
+  assert.equal(w.root.byClass('barfill')[0].style.width, '95%');
+  assert.ok(w.root.byClass('barfill')[0].classList.contains('high'));
+  assert.equal(pill.attrs.role, 'button');
+  assert.match(pill.attrs['aria-label'], /^Claude: 95% used/);
+});
+
+test('bar style: along the top it docks to the top edge', () => {
+  const w = loadWidget();
+  w.update('Claude', [real(10)], { meterStyle: 'bar-top' });
+  assert.match(w.host.style.cssText, /left:0;right:0;top:0/);
+  assert.ok(w.root.byClass('wrap')[0].classList.contains('top'));
+});
+
+test('bar style: a click opens the panel, there is no dragging, no Iris button, and Shift+arrows do nothing', () => {
+  const w = loadWidget();
+  w.update('Claude', [real(32)], { meterStyle: 'bar-top' });
+  const before = w.host.style.cssText;
+  const pill = w.pill();
+  pill.fire('pointerdown');
+  pill.fire('pointermove', { clientX: 300, clientY: 300 });
+  pill.fire('pointerup');
+  assert.ok(w.panelText(), 'a click (even with a wobble) opens the panel');
+  assert.equal(w.host.style.cssText, before, 'the bar never moves');
+  assert.equal(w.root.byClass('iris-btn').length, 0, 'Iris is not offered in bar style');
+  pill.fire('keydown', { key: 'ArrowLeft', shiftKey: true, preventDefault() {} });
+  assert.equal(w.host.style.cssText, before);
+});
+
+test('switching the style remounts the meter in place', () => {
+  const w = loadWidget();
+  w.update('Claude', [real(32)], { meterStyle: 'pill' });
+  assert.equal(w.root.byClass('barfill').length, 0);
+  w.update('Claude', [real(32)], { meterStyle: 'bar-bottom' });
+  assert.equal(w.root.byClass('barfill').length, 1);
+  w.update('Claude', [real(32)], { meterStyle: 'pill' });
+  assert.equal(w.root.byClass('barfill').length, 0);
+  assert.ok(!w.pill().classList.contains('bar'));
+});

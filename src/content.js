@@ -35,7 +35,7 @@
     try { chrome.runtime.sendMessage(msg).catch(() => {}); } catch {}
   };
   const safe = (fn, arg) => {
-    try { fn(arg); } catch (e) { console.warn('[AI Meter]', e); }
+    try { fn(arg); } catch (e) { console.warn('[Headroom]', e); }
   };
   const dlog = (entry) => {
     if (!settings.debug || !alive()) return;
@@ -53,7 +53,7 @@
     debug: () => !!settings.debug,
     log: (...a) => {
       if (!settings.debug) return;
-      console.log('[AI Meter]', adapter.id, ...a);
+      console.log('[Headroom]', adapter.id, ...a);
       dlog({ kind: 'note', url: host, body: a.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))).join(' ').slice(0, 3000) });
     },
     report(group, meters) {
@@ -75,7 +75,7 @@
       publish();
     },
     async getJSON(url, init) {
-      if (AM.dead) throw new Error('AI Meter was reloaded');
+      if (AM.dead) throw new Error('Headroom was reloaded');
       const r = await fetch(url, { credentials: 'include', ...(init || {}) });
       if (!r.ok) throw new Error(`${r.status} ${url}`);
       return r.json();
@@ -197,8 +197,8 @@
   // A broken adapter (it throws, or its parser chokes on a changed response) must not take the pill, the other
   // handlers or the page down: failures become a visible "can't read usage" problem instead.
   const failed = (what, e) => {
-    console.warn('[AI Meter]', adapter && adapter.id, what, e);
-    if (adapter) ctx.problem('error', 'AI Meter hit an internal error reading this site (' + what + ')');
+    console.warn('[Headroom]', adapter && adapter.id, what, e);
+    if (adapter) ctx.problem('error', 'Headroom hit an internal error reading this site (' + what + ')');
     if (problem) { problem.since = Date.now() - AM.PROBLEM_DELAY_MS; publish(); } // our own failure: show it now, not after the delay
   };
   const refreshAdapter = async () => {
@@ -234,7 +234,7 @@
         await AM.storage.set({ settings: { ...(stored || {}), [key]: value } });
       };
       try { adapter.init(ctx); } catch (e) { failed('start', e); }
-      try { AM.banner.watch(ctx); } catch (e) { console.warn('[AI Meter] banner', e); }
+      try { AM.banner.watch(ctx); } catch (e) { console.warn('[Headroom] banner', e); }
       pending.splice(0).forEach(handle);
       publish();
       checkHook();

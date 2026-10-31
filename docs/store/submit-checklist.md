@@ -4,8 +4,11 @@ Prepared in Stage 5 (2026-10-31). Everything that can be done from the repo is d
 
 ## 0. Blockers: do these before you submit
 
-- [ ] **Confirm the real-number claims you can't see in code.** The listing says AI Meter reads real numbers for Perplexity and Kimi (and ChatGPT's Codex usage). Those three have only been checked signed out, not signed in (`README.md`, "Verified live" says no). Either (a) load the unpacked extension in your Chrome, sign in, and check the pill against each site's own usage page, or (b) delete those lines from the long description in `docs/store/listing.md` so the store text only claims what is verified. Claude, Gemini and Grok are verified.
-- [ ] **Try the exact build.** `chrome://extensions` → Developer mode → Load unpacked → pick the `AI Meter` folder (or unzip `release/<date>/ai-meter-<version>.zip` and load that folder: it is what the store will get). Open a supported site: pill appears, click opens the panel, Iris moves. Open the toolbar popup and Settings. Remove the extension and load it again: the welcome page should open once.
+- [ ] **Check that "Headroom" is free for you.** It was chosen as the name; availability has not been checked. Search the Chrome Web Store for an existing "Headroom" extension, your trademark office's database, and the domain and GitHub names you want. If the Web Store title is taken, the store title can stay "Headroom: AI usage limit tracker" only if it is not a copy of another listing.
+- [ ] **Decide about the GitHub repository name.** The code, privacy URL and support URL still say `ai-meter` (`github.com/devshrawin/ai-meter`, `devshrawin.github.io/ai-meter/privacy`). If you rename the repo to `headroom`, GitHub redirects the old links, but the Pages privacy URL changes to `devshrawin.github.io/headroom/privacy`; then update the three URLs in `docs/store/listing.md` and in this checklist. Keeping the repo name is fine too.
+
+- [ ] **Confirm the real-number claims you can't see in code.** The listing says Headroom reads real numbers for Perplexity and Kimi (and ChatGPT's Codex usage). Those three have only been checked signed out, not signed in (`README.md`, "Verified live" says no). Either (a) load the unpacked extension in your Chrome, sign in, and check the pill against each site's own usage page, or (b) delete those lines from the long description in `docs/store/listing.md` so the store text only claims what is verified. Claude, Gemini and Grok are verified.
+- [ ] **Try the exact build.** `chrome://extensions` → Developer mode → Load unpacked → pick the `AI Meter` project folder (or unzip `release/<date>/headroom-<version>.zip` and load that folder: it is what the store will get). Open a supported site: pill appears, click opens the panel, Iris moves. Open the toolbar popup and Settings. Remove the extension and load it again: the welcome page should open once.
 - [ ] **Try Export / Import** in Settings: export, change a limit, import the file, check the limit came back.
 
 ## 1. One-time setup
@@ -16,7 +19,7 @@ Prepared in Stage 5 (2026-10-31). Everything that can be done from the repo is d
 
 ## 2. Upload
 
-- [ ] Build the zip: `npm run store-zip` (writes `release/<date>/ai-meter-<version>.zip`; it refuses to build if something is wrong).
+- [ ] Build the zip: `npm run store-zip` (writes `release/<date>/headroom-<version>.zip`; it refuses to build if something is wrong).
 - [ ] Dev console → **New item** → upload the zip.
 
 ## 3. Store listing tab

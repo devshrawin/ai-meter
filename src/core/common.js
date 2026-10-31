@@ -313,7 +313,7 @@
   AM.buildExport = (settings, version, now = new Date()) => {
     const s = AM.mergeSettings(settings);
     const keep = {};
-    for (const k of ['widget', 'chatStats', 'pet', 'irisEnergy', 'explore', 'notify', 'thresholds', 'debug', 'quotas', 'customSites']) keep[k] = s[k];
+    for (const k of ['widget', 'chatStats', 'pet', 'irisEnergy', 'meterStyle', 'explore', 'notify', 'thresholds', 'debug', 'quotas', 'customSites']) keep[k] = s[k];
     return { app: 'ai-meter', format: 1, version: version || '', exportedAt: now.toISOString(), settings: keep };
   };
 
@@ -322,17 +322,18 @@
   // decides which to keep, because a site needs Chrome's permission, which only the user can grant.
   AM.parseImport = (text) => {
     const fail = (error) => ({ ok: false, error });
-    if (typeof text !== 'string' || text.length > 200000) return fail('That file is too large to be an AI Meter backup.');
+    if (typeof text !== 'string' || text.length > 200000) return fail('That file is too large to be an Headroom backup.');
     let j;
     try { j = JSON.parse(text); } catch { return fail('That is not a valid JSON file.'); }
     if (!j || typeof j !== 'object' || j.app !== 'ai-meter' || !j.settings || typeof j.settings !== 'object' || Array.isArray(j.settings)) {
-      return fail('That file is not an AI Meter backup.');
+      return fail('That file is not an Headroom backup.');
     }
     const s = j.settings;
     const num = (v) => typeof v === 'number' && isFinite(v);
     const out = {};
     for (const k of ['widget', 'chatStats', 'pet', 'explore', 'notify', 'debug']) if (typeof s[k] === 'boolean') out[k] = s[k];
     if (s.irisEnergy === 'calm' || s.irisEnergy === 'lively') out.irisEnergy = s.irisEnergy;
+    if (['pill', 'bar-top', 'bar-bottom'].includes(s.meterStyle)) out.meterStyle = s.meterStyle;
     if (Array.isArray(s.thresholds)) {
       const t = s.thresholds.filter((n) => num(n) && n > 0 && n <= 100).slice(0, 10);
       if (t.length) out.thresholds = t;
@@ -373,7 +374,7 @@
     AM.problemVisible(problem, now) && !(meters || []).some((m) => m.source === 'real') ? problem : null;
   AM.describeProblem = (p) => (p && p.kind === 'signin'
     ? { title: 'Sign in to see limits', pill: 'sign in', detail: p.text || 'You are not signed in here, so the site has no limits to show.' }
-    : { title: "Can't read usage here", pill: "can't read usage", detail: p && p.text ? String(p.text).slice(0, 160) : 'The site did not return usage in a form AI Meter understands.' });
+    : { title: "Can't read usage here", pill: "can't read usage", detail: p && p.text ? String(p.text).slice(0, 160) : 'The site did not return usage in a form Headroom understands.' });
   // "HTTP 401" from an error thrown by ctx.getJSON ("401 /path...") without leaking the path (it can hold ids).
   AM.errText = (e) => {
     const m = String((e && e.message) || e || '').match(/^(\d{3})\b/);
@@ -383,7 +384,7 @@
 
   // Text for the "Copy debug log" button. Shape-only debug entries (never message text); request URLs are included.
   AM.buildDiagnostics = ({ version, provider, host, problem, meters, log, now = Date.now() }) => {
-    const lines = [`AI Meter ${version || '?'} | ${provider || '?'} | ${host || '?'} | ${new Date(now).toISOString()}`];
+    const lines = [`Headroom ${version || '?'} | ${provider || '?'} | ${host || '?'} | ${new Date(now).toISOString()}`];
     if (problem) lines.push(`Problem: ${problem.kind}: ${problem.text || ''}`.trim());
     lines.push('Meters: ' + ((meters || []).map((m) => `${m.label} ${AM.meterValue(m)} [${m.source}]`).join('; ') || 'none'));
     const entries = (log || []).filter((e) => !provider || e.provider === provider).slice(0, 40);

@@ -50,7 +50,7 @@ test('the copy-debug-log text has the provider, the problem, the meters and only
       { t: Date.UTC(2026, 9, 28, 9, 58, 0), provider: 'grok', kind: 'note', body: 'should not appear' },
     ],
   });
-  assert.match(text, /AI Meter 0\.9\.0 \| gemini \| gemini\.google\.com/);
+  assert.match(text, /Headroom 0\.9\.0 \| gemini \| gemini\.google\.com/);
   assert.match(text, /Problem: error: Usage request failed: HTTP 500/);
   assert.match(text, /Session \(5h\) 9% \[estimate\]/);
   assert.match(text, /Gemini usage RPC failed: 500/);

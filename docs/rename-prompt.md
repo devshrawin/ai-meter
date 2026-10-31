@@ -1,4 +1,5 @@
 # Prompt: rename AI Meter
+> Done: the name chosen was **Headroom** (2026-10-31). Kept for the record.
 
 Paste everything below the line into a model that can reason about names and, ideally, search the web (Claude, ChatGPT, etc.). Attach nothing; the product is described in the prompt.
 

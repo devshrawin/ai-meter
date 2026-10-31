@@ -1,4 +1,4 @@
-# Chrome Web Store listing: AI Meter
+# Chrome Web Store listing: Headroom
 
 Everything below is written to paste into the Chrome Web Store developer dashboard. Facts come from the code and the README; if the code changes, update this file with it.
 
@@ -6,7 +6,7 @@ Everything below is written to paste into the Chrome Web Store developer dashboa
 
 | Field | Value |
 |---|---|
-| Name | AI Meter: AI usage limit tracker |
+| Name | Headroom: AI usage limit tracker |
 | Category | Productivity |
 | Language | English |
 | Package version | 1.0.0 |
@@ -22,7 +22,7 @@ Everything below is written to paste into the Chrome Web Store developer dashboa
 
 ## Long description
 
-> AI Meter shows how much of your usage limit is left on the AI chat sites you use, right on the page, before you hit the wall.
+> Headroom shows how much of your usage limit is left on the AI chat sites you use, right on the page, before you hit the wall.
 >
 > A small glossy pill sits in the corner of the chat page. It shows the percentage used and when the limit resets. Click it for the details. A cat called Iris keeps you company on top of it: she is calm while you have plenty left, worried near the limit, stressed when you are about to run out, and asleep when you have.
 >
@@ -35,10 +35,10 @@ Everything below is written to paste into the Chrome Web Store developer dashboa
 > • ChatGPT: Codex usage windows, plus a message count for chat
 >
 > **Counted for the rest**
-> DeepSeek, Qwen, Le Chat, Copilot, Meta AI and Poe do not show usage, so AI Meter counts your sends against limits you set yourself.
+> DeepSeek, Qwen, Le Chat, Copilot, Meta AI and Poe do not show usage, so Headroom counts your sends against limits you set yourself.
 >
 > **Any other AI site**
-> Add any site in Settings. AI Meter asks for permission for that one site only.
+> Add any site in Settings. Headroom asks for permission for that one site only.
 >
 > **Also included**
 > • Toolbar badge with the current percentage
@@ -53,11 +53,11 @@ Everything below is written to paste into the Chrome Web Store developer dashboa
 > **Private by design**
 > Everything stays on your machine. There is no server, no account and no analytics. Usage requests go from your own logged-in tab to the provider's own site, exactly as its settings page would send them. Message text is never stored. See the privacy policy for the details.
 >
-> AI Meter is an independent project. It is not affiliated with, endorsed by or sponsored by Anthropic, OpenAI, Google, xAI, Perplexity, Moonshot AI, DeepSeek, Alibaba, Mistral AI, Microsoft, Meta or Quora. Product and company names are trademarks of their respective owners and are used only to say which services AI Meter works with.
+> Headroom is an independent project. It is not affiliated with, endorsed by or sponsored by Anthropic, OpenAI, Google, xAI, Perplexity, Moonshot AI, DeepSeek, Alibaba, Mistral AI, Microsoft, Meta or Quora. Product and company names are trademarks of their respective owners and are used only to say which services Headroom works with.
 
 ## Single-purpose statement
 
-> AI Meter has one purpose: to show how much of your usage limit remains on the AI chat websites you use, as an on-page meter, a toolbar badge and popup, and optional threshold notifications.
+> Headroom has one purpose: to show how much of your usage limit remains on the AI chat websites you use, as an on-page meter, a toolbar badge and popup, and optional threshold notifications.
 
 ## Permission justifications
 
@@ -67,7 +67,7 @@ Paste each into the matching box on the **Privacy practices** tab.
 Saves your settings (estimate limits, notification thresholds, added sites, Iris on or off), the latest usage numbers for each provider, a short list of send timestamps used for message counting, and the opt-in debug log. All in `chrome.storage.local`. Nothing is synced or sent anywhere.
 
 ### `alarms`
-Schedules a single alarm for the moment a limit resets, so AI Meter can tell you "your limit has reset" and clear the old warning state. No polling, no background work beyond that.
+Schedules a single alarm for the moment a limit resets, so Headroom can tell you "your limit has reset" and clear the old warning state. No polling, no background work beyond that.
 
 ### `notifications`
 Shows the optional desktop notifications when a meter crosses 75, 90 or 100 percent, and when a limit resets. Turn off in Settings. Notifications contain only the provider name, the meter name and the percentage.
@@ -76,7 +76,7 @@ Shows the optional desktop notifications when a meter crosses 75, 90 or 100 perc
 Used for two things only: (1) registering the content scripts for sites you add yourself in Settings, on the permission you grant for that one site, and (2) loading the Iris cat's code and images into a page only when Iris is switched on. No remote code is ever fetched or run.
 
 ### Host permissions (the provider sites)
-Each host below gets the content script and the page-world hook so AI Meter can read that provider's own usage data from your logged-in tab. The extension does not run on any other site unless you add it.
+Each host below gets the content script and the page-world hook so Headroom can read that provider's own usage data from your logged-in tab. The extension does not run on any other site unless you add it.
 
 | Host | Why it is needed |
 |---|---|
@@ -137,7 +137,7 @@ Upload 1 to 5 screenshots (the store allows five); 1, 2, 3, 4 and 6 are the stro
 
 ## Trademark disclaimer (use verbatim in the listing, README and privacy policy)
 
-> AI Meter is an independent project. It is not affiliated with, endorsed by or sponsored by Anthropic, OpenAI, Google, xAI, Perplexity, Moonshot AI, DeepSeek, Alibaba, Mistral AI, Microsoft, Meta or Quora. Claude, ChatGPT, Gemini, Grok, Perplexity, Kimi, DeepSeek, Qwen, Le Chat, Copilot, Meta AI and Poe, and all related names and logos, are trademarks of their respective owners. They are used here only to identify the services AI Meter works with.
+> Headroom is an independent project. It is not affiliated with, endorsed by or sponsored by Anthropic, OpenAI, Google, xAI, Perplexity, Moonshot AI, DeepSeek, Alibaba, Mistral AI, Microsoft, Meta or Quora. Claude, ChatGPT, Gemini, Grok, Perplexity, Kimi, DeepSeek, Qwen, Le Chat, Copilot, Meta AI and Poe, and all related names and logos, are trademarks of their respective owners. They are used here only to identify the services Headroom works with.
 
 ## Before you submit
 

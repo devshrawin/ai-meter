@@ -100,6 +100,7 @@
     chatStats: true,
     pet: true,
     irisEnergy: 'calm',
+    meterStyle: 'pill', // 'pill' | 'bar-top' | 'bar-bottom'
     explore: true,
     notify: true,
     thresholds: [75, 90, 100],
@@ -119,6 +120,7 @@
     ...AM.DEFAULT_SETTINGS,
     ...(s || {}),
     quotas: { ...AM.DEFAULT_QUOTAS, ...((s && s.quotas) || {}) },
+    meterStyle: ['pill', 'bar-top', 'bar-bottom'].includes(s && s.meterStyle) ? s.meterStyle : 'pill',
     thresholds: cleanThresholds(s && s.thresholds),
     customSites: cleanSites(s && s.customSites),
   });

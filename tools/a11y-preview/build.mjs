@@ -10,7 +10,7 @@ const out = (f, s) => writeFileSync(new URL('tools/a11y-preview/' + f, root), s)
 
 const script = (p) => `<script src="${p}"></script>`;
 out('widget.html', `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AI Meter pill preview</title>
+<title>Headroom pill preview</title>
 <style>:root{color-scheme:light dark}body{margin:0;min-height:100vh;font:15px system-ui;background:#fff;color:#202124}
 @media (prefers-color-scheme: dark){body{background:#212121;color:#ececec}}
 .page{max-width:620px;margin:40px auto;padding:0 16px}.chat{display:flex;flex-direction:column;gap:14px;margin-top:30px}.msg{max-width:78%;padding:12px 16px;border-radius:18px;line-height:1.45}.msg.me{align-self:flex-end;background:#ece9f7;color:#1f1d2b}.msg.ai{align-self:flex-start;background:#f4f4f5;color:#202124}@media (prefers-color-scheme: dark){.msg.me{background:#3b3563;color:#fff}.msg.ai{background:#2f2f2f;color:#ececec}}</style></head>

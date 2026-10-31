@@ -80,7 +80,25 @@
     .iris-face { width: 22px; height: 22px; object-fit: cover; object-position: 50% 12%; border-radius: 50%;
       background: #fff; border: 1px solid var(--line); transition: filter .2s, opacity .2s; }
     .iris-btn.away .iris-face { filter: grayscale(1); opacity: .6; }
+    /* Bar style: a thin full-width bar along the top or bottom edge; the label shows on hover or focus. */
+    .wrap.bar { width: 100%; align-items: flex-end; gap: 6px; }
+    .wrap.bar.top { flex-direction: column; }
+    .pill.bar { width: 100%; height: 6px; padding: 0; border: 0; border-radius: 0; background: var(--track); box-shadow: none; cursor: pointer; overflow: visible; transition: height .15s; }
+    .pill.bar::before { display: none; }
+    .pill.bar::after { content: ""; position: absolute; left: 0; right: 0; top: -3px; bottom: -3px; }
+    .pill.bar:hover, .pill.bar:focus-visible { height: 9px; box-shadow: none; }
+    .pill.bar:focus-visible { outline-offset: -2px; }
+    .pill.bar .dot { display: none; }
+    .barfill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--none); transition: width .6s cubic-bezier(.2,.8,.2,1); }
+    .barfill.low { background: var(--low); } .barfill.mid { background: var(--mid); } .barfill.high { background: var(--high); }
+    .pill.bar .info { position: absolute; right: 12px; opacity: 0; pointer-events: none; padding: 5px 12px 6px; border-radius: 999px; background: var(--glass);
+      border: 1px solid var(--line); box-shadow: 0 8px 18px -6px rgba(70,60,130,.28); transition: opacity .15s; }
+    .wrap.bar.top .pill.bar .info { top: 100%; margin-top: 8px; }
+    .wrap.bar.bottom .pill.bar .info { bottom: 100%; margin-bottom: 8px; }
+    .pill.bar:hover .info, .pill.bar:focus-visible .info { opacity: 1; }
+    .pill.bar[aria-expanded="true"] .info { opacity: 0; }
     @media (prefers-reduced-motion: reduce) {
+      .barfill { transition: none; }
       .dot.high { animation: none; }
       .pill, .fill, .iris-btn, .iris-face { transition: none; }
     }
@@ -97,10 +115,12 @@
   let petOn = false;
   let petPending = false;
   let petCssAdded = false;
+  let barMode = null; // 'top' | 'bottom' | null (pill)
+  let barFill = null;
   let styleEl = null;
   let lastSettings = {};
   let expanded = false;
-  let last = { name: 'AI Meter', meters: [], chat: null, problem: null };
+  let last = { name: 'Headroom', meters: [], chat: null, problem: null };
   let ticker = null;
 
   const el = (tag, cls, text) => {
@@ -125,7 +145,7 @@
 
   // Iris's engine and sprites are loaded into the tab only when she is switched on, and only on the built-in sites
   // (the sprites are web-accessible to those hosts alone; a site added in Settings gets the meter without her).
-  const irisAvailable = () => !AM.siteId || !String(AM.siteId).startsWith('site:');
+  const irisAvailable = () => !barMode && (!AM.siteId || !String(AM.siteId).startsWith('site:'));
   let petLoad = null;
   function ensurePet() {
     if (AM.createPet) return Promise.resolve(true);
@@ -174,22 +194,28 @@
     if (host || !document.body) return;
     host = document.createElement('div');
     host.setAttribute('data-aimeter', '');
+    const ms = lastSettings.meterStyle;
+    barMode = ms === 'bar-top' ? 'top' : ms === 'bar-bottom' ? 'bottom' : null;
     const pos = loadPos() || { right: 16, bottom: 16 };
-    host.style.cssText = `position:fixed;right:${pos.right}px;bottom:${pos.bottom}px;z-index:2147483646;`;
+    host.style.cssText = barMode
+      ? `position:fixed;left:0;right:0;${barMode}:0;z-index:2147483646;`
+      : `position:fixed;right:${pos.right}px;bottom:${pos.bottom}px;z-index:2147483646;`;
     root = host.attachShadow({ mode: 'open' });
     const style = el('style');
     style.textContent = CSS;
     styleEl = style;
-    wrap = el('div', 'wrap');
+    wrap = el('div', barMode ? 'wrap bar ' + barMode : 'wrap');
     panelBox = el('div');
-    pill = el('div', 'pill');
-    pill.title = 'AI Meter — click for details, drag to move';
+    pill = el('div', barMode ? 'pill bar' : 'pill');
+    pill.title = barMode ? 'Headroom — click for details' : 'Headroom — click for details, drag to move';
     pill.setAttribute('role', 'button');
     pill.tabIndex = 0;
     pill.setAttribute('aria-expanded', 'false');
     dot = el('span', 'dot');
     dot.setAttribute('aria-hidden', 'true');
     info = el('span', 'info');
+    barFill = null;
+    if (barMode) { barFill = el('span', 'barfill'); pill.append(barFill); }
     pill.append(dot, info);
     attachDrag(pill);
     attachKeys(pill);
@@ -203,7 +229,8 @@
   function unmount() {
     if (pet) pet.destroy();
     if (host) host.remove();
-    host = root = wrap = panelBox = pill = info = dot = pet = null;
+    host = root = wrap = panelBox = pill = info = dot = pet = barFill = null;
+    barMode = null;
     petOn = false;
     clearInterval(ticker);
   }
@@ -217,7 +244,7 @@
       try { target.setPointerCapture(e.pointerId); } catch {}
     });
     target.addEventListener('pointermove', (e) => {
-      if (!start) return;
+      if (!start || barMode) return;
       const dx = e.clientX - start.x;
       const dy = e.clientY - start.y;
       // Dragging Iris herself picks her up and carries her (the pill stays put).
@@ -262,7 +289,7 @@
         e.preventDefault();
         expanded = false;
         render();
-      } else if (e.shiftKey && /^Arrow(Left|Right|Up|Down)$/.test(e.key)) {
+      } else if (!barMode && e.shiftKey && /^Arrow(Left|Right|Up|Down)$/.test(e.key)) {
         e.preventDefault();
         const step = 16;
         const cur = { right: parseFloat(host.style.right) || 0, bottom: parseFloat(host.style.bottom) || 0 };
@@ -315,7 +342,7 @@
     if (AM.copyDiagnostics) {
       const btn = el('button', null, 'Copy debug log');
       btn.type = 'button';
-      btn.title = 'Copies what AI Meter saw on this page (request addresses and shapes, never message text)';
+      btn.title = 'Copies what Headroom saw on this page (request addresses and shapes, never message text)';
       btn.setAttribute('aria-live', 'polite');
       btn.addEventListener('click', async () => {
         const ok = await AM.copyDiagnostics();
@@ -337,7 +364,7 @@
     h.className = 'h';
     h.setAttribute('role', 'heading');
     h.setAttribute('aria-level', '2');
-    h.append(el('span', null, last.name), el('span', 'muted', 'AI Meter'));
+    h.append(el('span', null, last.name), el('span', 'muted', 'Headroom'));
     panel.append(h);
     if (last.chat) panel.append(chatSection(last.chat, now));
     if (last.problem) panel.append(problemBox(last.problem));
@@ -401,6 +428,10 @@
       pill.setAttribute('aria-label', last.name + ': ' + say + '. ' + (expanded ? 'Hide details' : 'Show details'));
     }
     dot.className = 'dot ' + (last.problem && !top ? 'warn' : AM.level(topPct));
+    if (barFill) {
+      barFill.className = 'barfill ' + (topPct != null ? AM.level(topPct) : 'none');
+      barFill.style.width = (topPct ?? 0) + '%';
+    }
     info.textContent = '';
     if (!top) {
       info.append(el('span', null, last.name), el('span', 'muted', last.problem ? AM.describeProblem(last.problem).pill : '—'));
@@ -437,6 +468,9 @@
       if (AM.dead) return;
       last = { name, meters, chat: chat || null, problem: problem || null };
       if (!settings.widget) return unmount();
+      const wanted = settings.meterStyle === 'bar-top' || settings.meterStyle === 'bar-bottom' ? settings.meterStyle : 'pill';
+      if (host && lastSettings.meterStyle !== undefined && wanted !== (lastSettings.meterStyle || 'pill')) unmount();
+      lastSettings = settings;
       if (!host) {
         if (!document.body) {
           document.addEventListener('DOMContentLoaded', () => AM.widget.update(name, last.meters, settings, last.chat, last.problem), { once: true });

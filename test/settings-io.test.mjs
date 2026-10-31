@@ -22,7 +22,7 @@ test('export holds settings only, with a version and a timestamp', () => {
   assert.deepEqual(file.settings.thresholds, [60, 95]);
   assert.equal('usage' in file.settings, false);
   assert.equal('debug.log' in file.settings, false);
-  assert.deepEqual(Object.keys(file.settings).sort(), ['chatStats', 'customSites', 'debug', 'explore', 'irisEnergy', 'notify', 'pet', 'quotas', 'thresholds', 'widget']);
+  assert.deepEqual(Object.keys(file.settings).sort(), ['chatStats', 'customSites', 'debug', 'explore', 'irisEnergy', 'meterStyle', 'notify', 'pet', 'quotas', 'thresholds', 'widget']);
 });
 
 test('export then import round-trips the settings', () => {
@@ -39,10 +39,10 @@ test('export then import round-trips the settings', () => {
 test('import rejects things that are not a backup', () => {
   for (const [text, msg] of [
     ['not json', /valid JSON/],
-    ['[]', /not an AI Meter backup/],
-    ['{"app":"other","settings":{}}', /not an AI Meter backup/],
-    ['{"app":"ai-meter"}', /not an AI Meter backup/],
-    ['{"app":"ai-meter","settings":[]}', /not an AI Meter backup/],
+    ['[]', /not an Headroom backup/],
+    ['{"app":"other","settings":{}}', /not an Headroom backup/],
+    ['{"app":"ai-meter"}', /not an Headroom backup/],
+    ['{"app":"ai-meter","settings":[]}', /not an Headroom backup/],
     [' '.repeat(200001), /too large/],
     [null, /too large/],
   ]) {
@@ -99,4 +99,14 @@ test('first install opens the welcome page; an update or browser update does not
   await fire({ reason: 'install' });
   assert.equal(bg.tabsCreated.length, 1);
   assert.match(bg.tabsCreated[0].url, /src\/welcome\/welcome\.html$/);
+});
+
+test('meterStyle: only the three known values are kept, in settings and in an import', () => {
+  assert.equal(AM.mergeSettings(null).meterStyle, 'pill');
+  assert.equal(AM.mergeSettings({ meterStyle: 'bar-top' }).meterStyle, 'bar-top');
+  assert.equal(AM.mergeSettings({ meterStyle: 'bar-bottom' }).meterStyle, 'bar-bottom');
+  assert.equal(AM.mergeSettings({ meterStyle: 'sideways' }).meterStyle, 'pill');
+  assert.equal(AM.parseImport(wrap({ meterStyle: 'bar-bottom' })).settings.meterStyle, 'bar-bottom');
+  assert.equal('meterStyle' in AM.parseImport(wrap({ meterStyle: 'x' })).settings, false);
+  assert.equal(AM.buildExport({ meterStyle: 'bar-top' }, '1.0.0').settings.meterStyle, 'bar-top');
 });

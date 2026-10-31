@@ -62,7 +62,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   if (!msg || msg.type !== 'aimeter:usage') return;
   const report = AM.validateUsageMessage(msg);
-  if (!report) { console.warn('[AI Meter] ignored a malformed usage report'); return; }
+  if (!report) { console.warn('[Headroom] ignored a malformed usage report'); return; }
   // One at a time: two tabs reporting together would otherwise both read "notified" before either wrote it back.
   queue = queue.then(async () => {
     const entry = { provider: report.provider, name: report.name, meters: report.meters, problem: report.problem, updatedAt: Date.now() };
@@ -70,7 +70,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (sender.tab && sender.tab.id != null) setBadge(sender.tab.id, entry.meters);
     const settings = await getSettings();
     if (settings.notify) await checkThresholds(entry, settings);
-  }).catch((e) => console.warn('[AI Meter]', e));
+  }).catch((e) => console.warn('[Headroom]', e));
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
@@ -88,7 +88,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
       title: `${name}: ${label} has reset`,
       message: 'You should be good to go again.',
     });
-  }).catch((e) => console.warn('[AI Meter]', e));
+  }).catch((e) => console.warn('[Headroom]', e));
 });
 
 // Keep dynamic content scripts for user-added sites in step with settings (they can be dropped on update).
@@ -99,7 +99,7 @@ async function syncSites() {
     const origins = [`https://${site.host}/*`];
     if (!(await chrome.permissions.contains({ origins }))) continue;
     const missing = AM.siteScripts(site.host).filter((s) => !registered.has(s.id));
-    if (missing.length) await chrome.scripting.registerContentScripts(missing).catch((e) => console.warn('[AI Meter]', e));
+    if (missing.length) await chrome.scripting.registerContentScripts(missing).catch((e) => console.warn('[Headroom]', e));
   }
 }
 chrome.runtime.onInstalled.addListener((details) => {

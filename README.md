@@ -1,4 +1,6 @@
-# AI Meter
+# Headroom
+
+*Formerly AI Meter. The code keeps the old name in a few internal identifiers (`AIMeter`, `aimeter:` messages, the `aimeter.pos` storage key) so nothing a user has saved is lost.*
 
 A Chrome extension that shows how much of your usage limit is left on **Claude, ChatGPT, Gemini, Grok, Perplexity, Kimi, DeepSeek, Qwen, Le Chat, Copilot, Meta AI, Poe — and any other AI chat site you add** — as a small draggable meter on the page, a toolbar badge, and a popup with every provider in one place. Desktop notifications fire at 75 / 90 / 100 % and again when a limit resets.
 
@@ -73,7 +75,7 @@ The other poses are 16 sprite frames in `src/assets/iris/`. The current art is t
 
 ## Adding any AI site
 
-Settings → **Other AI sites** → enter the hostname (e.g. `chat.example.com`), optional limit + window → **Add site**. Chrome asks for access to that one site only (`optional_host_permissions`); AI Meter then registers its scripts there with `chrome.scripting.registerContentScripts`. Remove the site to revoke access.
+Settings → **Other AI sites** → enter the hostname (e.g. `chat.example.com`), optional limit + window → **Add site**. Chrome asks for access to that one site only (`optional_host_permissions`); Headroom then registers its scripts there with `chrome.scripting.registerContentScripts`. Remove the site to revoke access.
 
 ## Privacy
 
@@ -90,7 +92,7 @@ The full policy is in [`docs/privacy.md`](docs/privacy.md). The short version:
 
 ## Not affiliated
 
-AI Meter is an independent project. It is not affiliated with, endorsed by or sponsored by Anthropic, OpenAI, Google, xAI, Perplexity, Moonshot AI, DeepSeek, Alibaba, Mistral AI, Microsoft, Meta or Quora. Claude, ChatGPT, Gemini, Grok, Perplexity, Kimi, DeepSeek, Qwen, Le Chat, Copilot, Meta AI and Poe, and all related names and logos, are trademarks of their respective owners. They are used here only to identify the services AI Meter works with.
+Headroom is an independent project. It is not affiliated with, endorsed by or sponsored by Anthropic, OpenAI, Google, xAI, Perplexity, Moonshot AI, DeepSeek, Alibaba, Mistral AI, Microsoft, Meta or Quora. Claude, ChatGPT, Gemini, Grok, Perplexity, Kimi, DeepSeek, Qwen, Le Chat, Copilot, Meta AI and Poe, and all related names and logos, are trademarks of their respective owners. They are used here only to identify the services Headroom works with.
 
 ## Store listing
 
@@ -138,7 +140,7 @@ docs/                         privacy policy, store listing and checklist, secur
 
 ```bash
 npm test            # node --test, no dependencies to install
-npm run store-zip   # release/<date>/ai-meter-<version>.zip, the file you upload to the Web Store
+npm run store-zip   # release/<date>/headroom-<version>.zip, the file you upload to the Web Store
 ```
 
 Bump `manifest.json`, `package.json` and `CHANGELOG.md` together. One dated release folder, one zip.
