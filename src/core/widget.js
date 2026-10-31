@@ -105,7 +105,11 @@
   };
 
   const loadPos = () => {
-    try { return JSON.parse(localStorage.getItem(POS_KEY)) || null; } catch { return null; }
+    try {
+      const p = JSON.parse(localStorage.getItem(POS_KEY));
+      const ok = (n) => Number.isFinite(n) && n >= -20 && n <= 20000;
+      return p && ok(p.right) && ok(p.bottom) ? { right: p.right, bottom: p.bottom } : null;
+    } catch { return null; }
   };
   const savePos = (p) => {
     try { localStorage.setItem(POS_KEY, JSON.stringify(p)); } catch {}

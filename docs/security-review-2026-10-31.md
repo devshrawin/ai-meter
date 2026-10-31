@@ -1,0 +1,34 @@
+# Security review: AI Meter 0.10.0 → 1.0.0 (Stage 3)
+
+Date: 2026-10-31. Scope: the whole extension (`manifest.json`, `src/`). Method: line-by-line read of the page-world hook, content script, service worker, shared helpers, adapters and options page; the agent-skills pre-ship checklist (secrets, dependencies, remote code, CSP, input validation); runtime tests for every fix (`test/hardening.test.mjs`, `test/channel.test.mjs`, `test/content.test.mjs`). Not done: a live pen-test against a hostile page in a real browser (see "Not verified").
+
+## Findings
+
+| # | Severity | Finding | Status |
+|---|---|---|---|
+| 1 | **Medium** | `inject.js` forwarded the body of every non-"private" request to the content script. On a **site the user adds** (any https site), that included sign-in, password, OAuth and payment POSTs (it only skipped `/auth/`, `/session`, `/token`, `/me`, `/account`, `/profile`). The data stayed in memory and was never stored or sent, but a banking or checkout page should never reach the extension at all. | **Fixed.** Login, sign-up/in, password, OAuth/SSO, OTP/MFA/2FA, checkout and payment URLs are now private (body never forwarded). On every body that is forwarded, values of fields named password / token / secret / otp / cvv / card number / ssn / api key / authorization are masked. Tests cover nine URL shapes and JSON, form and nested bodies. |
+| 2 | **Medium** | The opt-in debug log and "Copy debug log" could hold emails, bearer tokens, JWTs, org/user UUIDs and long ids from response bodies and URLs (for example the Claude org id in the usage URL, or a subscription response). Local only, but a user pastes this log into bug reports. | **Fixed.** `AM.redact` masks emails, `Bearer …`, JWTs, UUIDs and 32+ character opaque strings. It runs when an entry is written **and** again when diagnostics are copied (so old stored logs are covered). |
+| 3 | **Medium** | No per-adapter fail-safe: an adapter whose `init()` threw stopped the rest of start-up (no banner watcher, no first publish, so no pill), and a `refresh()` that threw (sync or rejected) escaped from the settings-change and refresh-message handlers. | **Fixed.** `init`, `banner.watch` and every `refresh` call are wrapped. A failure becomes an immediate "can't read usage here" problem in the pill, popup and debug log; the pill and other handlers keep working. Tests cover init throw, sync refresh throw and async refresh rejection. |
+| 4 | Low | The service worker stored and notified on whatever a content script reported (provider key, names, meter fields), with no type or size checks. Content scripts run in an isolated world and the page cannot reach them, so exposure was limited to a bug. | **Fixed.** `AM.validateUsageMessage` rebuilds each report field by field (provider charset and length, name and label caps, numeric fields finite, `source` in a fixed set, at most 60 meters). Malformed reports are dropped with a console warning. |
+| 5 | Low | `mergeSettings` trusted stored `customSites` and `thresholds`. A corrupt or hand-edited value could register a content script on a malformed pattern, or break threshold logic. | **Fixed.** Sites must be valid hostnames; thresholds must be numbers in (0, 100]; otherwise defaults apply. |
+| 6 | Low | The pill's saved position is read from the page's own `localStorage`, which page scripts can write. A hostile value (NaN, huge numbers) could push the pill off-screen. | **Fixed.** Values are validated as finite numbers in a sane range. |
+| 7 | Info | Request bodies (including chat message text) pass through the content script's memory so adapters can read the `model` field and Gemini's replay parameters. Nothing writes them to storage or the log: stored events hold only a model name (80 chars) and a timestamp; the debug log holds key names and short model-like values. | **Accepted, as documented** in the privacy policy ("held in memory only for as long as it takes to read the model name or the usage figures"). |
+| 8 | Info | ChatGPT: `wham/usage` failure or an empty `conversation/init` shape logs but does not raise the "can't read usage" state, because chat counting (estimate) still works and Codex usage does not exist on free plans. | **Accepted.** Showing an error for free-plan users would be wrong. Revisit if a signed-in Codex user reports a stale Codex meter. |
+| 9 | Info | `gemini.js` reads `document.documentElement.innerHTML` once per refresh when the page's request parameters have not been seen yet. Read-only and bounded, but it is the only large DOM read. | **Accepted.** |
+
+## Re-checked and clean
+
+- **Page-world channel.** Private `MessageChannel`; the `hello` is swallowed in the capture phase, a second or cross-origin `hello` is ignored, nothing but a public "ready" ping goes over `window.postMessage`, and every message is validated and rebuilt (`validateInjectMessage`). Covered by the existing channel tests plus the new ones.
+- **Permissions vs `docs/store/listing.md`.** `storage`, `alarms`, `notifications`, `scripting` each map to a documented use. All 18 `host_permissions` hosts are in the listing's table. No `tabs`, `cookies`, `webRequest`, `history`, or `<all_urls>`.
+- **`optional_host_permissions`.** `https://*/*` is only requested one origin at a time from the Add site click (the request is the first await, so it counts as a user gesture), validated by a strict hostname pattern, and removed with the site.
+- **Tokens in memory only.** The ChatGPT access token is held in a variable for 10 minutes and sent only to `chatgpt.com`; the Kimi `kimi-auth` cookie is read at call time and sent only to `kimi.com`. Neither is written to storage, the debug log or any message. `/api/auth/session` and similar responses are on the private list, so the page hook never forwards them.
+- **No prompt text stored.** `AM.events.record` stores a model name and timestamp only; the debug log stores structure, not text (`bodyShape`).
+- **No remote code, no eval, no `innerHTML` with data.** All network calls are same-origin from the user's own tab to the provider they are on. Extension pages use no inline script or handlers (default MV3 CSP applies). The widget and popup build DOM with `textContent`.
+- **Secrets in the repo.** A scan of tracked files for keys, tokens and passwords found nothing. No dependencies, so no `npm audit` surface.
+- **Web-accessible resources.** Only the Iris images, only to the built-in provider hosts (not to user-added sites), with `use_dynamic_url`.
+
+## Not verified
+
+- A hostile page in a real browser attempting to hijack the channel or forge reports (covered by simulation tests only).
+- The new masking and private-URL rules against real login and checkout flows on a user-added site.
+- Provider API shape changes beyond the fixtures and the signed-out smoke test; Stage 2's signed-in live checks are still open.

@@ -22,7 +22,7 @@ AI Meter is a Chrome extension that shows how much of your usage limit is left o
 | **Chat length** (for the "This chat" figures) | The number of characters in the open conversation on the page | A character and message count only. Never the text | No |
 | **Your settings** | You | Estimate limits, thresholds, added sites, Iris on or off, in `chrome.storage.local` | No |
 | **Meter position** | You, when you drag the meter | The pill position, saved under the key `aimeter.pos` in the page's own `localStorage` | No |
-| **Debug log** (off by default) | The extension itself, only if you tick Debug | Key names and short model-like values of requests, full bodies only of usage and limit endpoints, and only the *shape* (keys and types) of anything else. Stored locally, capped to the latest entries; clear it any time in Settings | No, unless you choose to copy and paste it yourself |
+| **Debug log** (off by default) | The extension itself, only if you tick Debug | Key names and short model-like values of requests, full bodies only of usage and limit endpoints, and only the *shape* (keys and types) of anything else. Emails, tokens and long ids in it are masked. Stored locally, capped to the latest entries; clear it any time in Settings | No, unless you choose to copy and paste it yourself |
 
 ## How the page-world script works
 

@@ -61,10 +61,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true; // async response
   }
   if (!msg || msg.type !== 'aimeter:usage') return;
+  const report = AM.validateUsageMessage(msg);
+  if (!report) { console.warn('[AI Meter] ignored a malformed usage report'); return; }
   // One at a time: two tabs reporting together would otherwise both read "notified" before either wrote it back.
   queue = queue.then(async () => {
-    const entry = { provider: msg.provider, name: msg.name, meters: msg.meters || [], problem: msg.problem || null, updatedAt: Date.now() };
-    await chrome.storage.local.set({ ['usage.' + msg.provider]: entry });
+    const entry = { provider: report.provider, name: report.name, meters: report.meters, problem: report.problem, updatedAt: Date.now() };
+    await chrome.storage.local.set({ ['usage.' + report.provider]: entry });
     if (sender.tab && sender.tab.id != null) setBadge(sender.tab.id, entry.meters);
     const settings = await getSettings();
     if (settings.notify) await checkThresholds(entry, settings);

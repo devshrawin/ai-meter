@@ -259,6 +259,55 @@
     }
   };
 
+  // ---- redaction for anything written to the debug log or copied out as diagnostics ----
+  // Emails, bearer tokens, JWTs, UUIDs and long opaque strings are masked. Debug is opt-in and local, but a pasted
+  // log should never carry an identity or a credential.
+  AM.redact = (text) => String(text == null ? '' : text)
+    .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/g, '[email]')
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [token]')
+    .replace(/\beyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]*/g, '[token]')
+    .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, '[id]')
+    .replace(/\b[A-Za-z0-9_-]{32,}\b/g, '[token]');
+
+  // ---- messages from content scripts to the service worker ----
+  // Content scripts run in an isolated world, but their reports still cross a trust boundary on the way to storage,
+  // notifications and the badge. Only well-formed reports are accepted, rebuilt field by field with size caps.
+  AM.validateUsageMessage = (m) => {
+    if (!m || typeof m !== 'object' || Array.isArray(m)) return null;
+    const str = (v, max) => typeof v === 'string' && v.length > 0 && v.length <= max;
+    const num = (v) => typeof v === 'number' && isFinite(v);
+    if (typeof m.provider !== 'string' || !/^[A-Za-z0-9:._-]{1,100}$/.test(m.provider) || !str(m.name, 80)) return null;
+    if (!Array.isArray(m.meters) || m.meters.length > 60) return null;
+    const meters = [];
+    for (const x of m.meters) {
+      if (!x || typeof x !== 'object' || Array.isArray(x) || !str(x.id, 100) || !str(x.label, 100)) return null;
+      const o = { id: x.id, label: x.label };
+      for (const k of ['pct', 'used', 'limit', 'remaining', 'resetAt', 'windowHours', 'seenAt', 'raw']) {
+        if (x[k] == null) continue;
+        if (!num(x[k])) return null;
+        o[k] = x[k];
+      }
+      if (x.source != null) {
+        if (!['real', 'estimate', 'banner'].includes(x.source)) return null;
+        o.source = x.source;
+      }
+      if (x.secondary != null) o.secondary = !!x.secondary;
+      if (x.inferred != null) o.inferred = !!x.inferred;
+      if (x.note != null) {
+        if (typeof x.note !== 'string' || x.note.length > 300) return null;
+        o.note = x.note;
+      }
+      meters.push(o);
+    }
+    let problem = null;
+    if (m.problem != null) {
+      const p = m.problem;
+      if (!p || typeof p !== 'object' || !['error', 'signin'].includes(p.kind) || (p.text != null && !str(p.text, 200) && p.text !== '')) return null;
+      problem = { kind: p.kind, text: p.text || '', since: num(p.since) ? p.since : Date.now() };
+    }
+    return { provider: m.provider, name: m.name, meters, problem };
+  };
+
   // ---- "can't read usage here" ----
   // An adapter reports a problem when its usage call fails or its parser finds nothing. Transient errors
   // (the page hasn't made its own calls yet) must not flash a warning, so an 'error' only shows once it has
@@ -286,7 +335,7 @@
     const entries = (log || []).filter((e) => !provider || e.provider === provider).slice(0, 40);
     if (!entries.length) lines.push('(No debug entries. Tick Debug in Settings, reload the tab, then copy again for request details.)');
     for (const e of entries) {
-      lines.push(`${new Date(e.t).toISOString().slice(11, 19)} ${e.kind || ''} ${e.method || ''}${e.status ? ' ' + e.status : ''} ${e.url || ''}${e.body ? ' | ' + String(e.body).slice(0, 300) : ''}`.replace(/\s+/g, ' ').trim());
+      lines.push(AM.redact(`${new Date(e.t).toISOString().slice(11, 19)} ${e.kind || ''} ${e.method || ''}${e.status ? ' ' + e.status : ''} ${e.url || ''}${e.body ? ' | ' + String(e.body).slice(0, 300) : ''}`).replace(/\s+/g, ' ').trim());
     }
     return lines.join('\n');
   };

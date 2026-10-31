@@ -9,7 +9,10 @@
   // Analytics/telemetry endpoints that would flood the discovery log.
   const NOISE = /\/_data\/|cdn-cgi|\/rum\b|analytics|telemetry|statsig|sentry|segment|amplitude|datadog|event_logging|\/ping\b|heartbeat|\/log(s|ging)?\b|\/events?\b|\/t\/?$/i;
   // Never forward bodies from auth endpoints: they carry identity and tokens.
-  const PRIVATE = /\/auth\/|\/session\b|\/token\b|\/me\b|\/account\b|\/profile\b/i;
+  const PRIVATE = /\/auth\/|\/session\b|\/token\b|\/me\b|\/account\b|\/profile\b|log-?in|sign-?(in|up)|password|passwd|oauth|\/sso\b|[/_-]otp\b|\bmfa\b|2fa|checkout|payment/i;
+  // On any body that does get forwarded, values of secret-looking fields are masked (this also runs on sites the user adds).
+  const SECRET = /("?[\w.-]*(?:pass(?:word|wd)?|pwd|secret|token|otp|cvv|cvc|card[-_ ]?(?:number|no)|ssn|api[-_]?key|authorization)[\w.-]*"?\s*[:=]\s*)("(?:[^"\\]|\\.)*"|[^&,}\s]+)/gi;
+  const scrub = (t) => String(t).replace(SECRET, '$1"[redacted]"');
   const BINARY = /grpc|proto|octet-stream/i;
   const MAX_REQ = 20000;
   const MAX_RES = 200000;
@@ -55,8 +58,8 @@
     } catch { return false; }
   };
   const bodyText = (b) => {
-    if (typeof b === 'string') return b.slice(0, MAX_REQ);
-    if (b instanceof URLSearchParams) return b.toString().slice(0, MAX_REQ);
+    if (typeof b === 'string') return scrub(b.slice(0, MAX_REQ));
+    if (b instanceof URLSearchParams) return scrub(b.toString().slice(0, MAX_REQ));
     return null;
   };
   const toB64 = (buf) => {
@@ -122,7 +125,7 @@
       body = priv ? null : bodyText(init && init.body);
       if (!priv && body == null && input instanceof Request && method !== 'GET' && method !== 'HEAD') {
         input.clone().text()
-          .then((t) => post({ kind: 'request', url, method, body: t.slice(0, MAX_REQ) }))
+          .then((t) => post({ kind: 'request', url, method, body: scrub(t.slice(0, MAX_REQ)) }))
           .catch(() => post({ kind: 'request', url, method, body: null }));
       } else {
         post({ kind: 'request', url, method, body });
@@ -180,7 +183,7 @@
   const WSS = WebSocket.prototype.send;
   WebSocket.prototype.send = function (data) {
     try {
-      if (typeof data === 'string' && data.length > 40) post({ kind: 'request', url: this.url, method: 'WS', body: PRIVATE.test(this.url) ? null : data.slice(0, MAX_REQ) });
+      if (typeof data === 'string' && data.length > 40) post({ kind: 'request', url: this.url, method: 'WS', body: PRIVATE.test(this.url) ? null : scrub(data.slice(0, MAX_REQ)) });
     } catch {}
     return WSS.apply(this, arguments);
   };

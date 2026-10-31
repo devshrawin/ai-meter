@@ -12,7 +12,7 @@ const quotas = (() => {
 })();
 
 // Runs the real content-script bundle (exactly the manifest's file order) on a fake page at `host`.
-async function loadContent(host, { settings, top = true } = {}) {
+async function loadContent(host, { settings, top = true, beforeContent } = {}) {
   const document = makeDocument();
   document.documentElement = { innerHTML: '', lang: 'en' };
   document.querySelector = () => null;
@@ -54,7 +54,10 @@ async function loadContent(host, { settings, top = true } = {}) {
   if (top) vm.runInContext('window.top = window', ctx);
   const files = ['src/core/quotas.js', ...quotas.CONTENT_BUNDLE.filter((f) => f !== 'src/core/quotas.js')];
   const unique = [...new Set(files)];
-  for (const f of unique) vm.runInContext(read(f), ctx, { filename: f });
+  for (const f of unique) {
+    if (f === 'src/content.js' && beforeContent) beforeContent(ctx.AIMeter);
+    vm.runInContext(read(f), ctx, { filename: f });
+  }
   await new Promise((r) => setTimeout(r, 30));
   const usage = () => sent.filter((m) => m.type === 'aimeter:usage');
   return { AM: ctx.AIMeter, sent, usage, onMessage, onChanged, stored, document, ctx };
@@ -133,4 +136,28 @@ test('a settings change re-applies without reloading the page', async () => {
   c.onChanged.forEach((fn) => fn({ settings: { newValue: { widget: false } } }, 'local'));
   await new Promise((r) => setTimeout(r, 30));
   assert.ok(c.usage().length > before, 'publishes again after a settings change');
+});
+
+// ---------- hardening: one broken adapter must not break the pill ----------
+
+const brokenAdapter = (over) => (AM) => {
+  AM.adapterFor = () => ({ id: 'broken', name: 'Broken', hosts: [], init() {}, ...over });
+};
+
+test("an adapter whose init throws still gets a pill and a visible can't-read-usage problem", async () => {
+  const c = await loadContent('broken.example', { beforeContent: brokenAdapter({ init() { throw new Error('boom'); } }) });
+  assert.ok(c.usage().length > 0, 'the report still goes out');
+  const last = c.usage().at(-1);
+  assert.equal(last.problem && last.problem.kind, 'error');
+});
+
+test('an adapter whose refresh throws (sync or async) is contained: the request is still answered', async () => {
+  for (const refresh of [() => { throw new Error('sync'); }, async () => { throw new Error('async'); }]) {
+    const c = await loadContent('broken.example', { beforeContent: brokenAdapter({ refresh }) });
+    let replied = null;
+    c.onMessage.forEach((fn) => fn({ type: 'aimeter:refresh' }, {}, (r) => { replied = r; }));
+    await new Promise((r) => setTimeout(r, 30));
+    assert.equal(replied && replied.ok, true);
+    c.onChanged.forEach((fn) => fn({ settings: { newValue: {} } }, 'local')); // a settings change must not throw either
+  }
 });

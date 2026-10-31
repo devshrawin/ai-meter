@@ -108,10 +108,18 @@
     customSites: [],
   };
 
+  const HOST_RE = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/;
+  const cleanSites = (list) => (Array.isArray(list) ? list : []).filter((x) => x && typeof x.host === 'string' && HOST_RE.test(x.host) && x.host.length <= 253);
+  const cleanThresholds = (list) => {
+    const t = Array.isArray(list) ? list.filter((n) => typeof n === 'number' && isFinite(n) && n > 0 && n <= 100) : [];
+    return t.length ? t : AM.DEFAULT_SETTINGS.thresholds;
+  };
+
   AM.mergeSettings = (s) => ({
     ...AM.DEFAULT_SETTINGS,
     ...(s || {}),
     quotas: { ...AM.DEFAULT_QUOTAS, ...((s && s.quotas) || {}) },
-    customSites: Array.isArray(s && s.customSites) ? s.customSites : [],
+    thresholds: cleanThresholds(s && s.thresholds),
+    customSites: cleanSites(s && s.customSites),
   });
 })();

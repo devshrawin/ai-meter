@@ -9,6 +9,12 @@ All notable changes to AI Meter. Versions follow `manifest.json`.
 
 ## Unreleased (1.0.0)
 
+### Security
+- Sign-in, password, OAuth, MFA, checkout and payment requests are never read by the page hook, and secret-looking fields (password, token, key, card number) are masked in any body it does forward. This matters on sites you add yourself.
+- The debug log and "Copy debug log" mask emails, bearer tokens, JWTs, ids and long opaque strings.
+- The service worker validates every usage report; stored settings (added sites, thresholds) and the pill position are sanitised on load.
+- One broken site adapter can no longer stop the pill or the others: a failure now shows as "can't read usage here". Review: `docs/security-review-2026-10-31.md`.
+
 ### Fixed
 - Two tabs reporting usage at the same moment could each fire the same threshold notification; usage and reset handling now run one at a time.
 - A reset notification was lost or garbled when a provider name or limit label contained a `|`.

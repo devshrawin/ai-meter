@@ -38,7 +38,11 @@
     try { fn(arg); } catch (e) { console.warn('[AI Meter]', e); }
   };
   const dlog = (entry) => {
-    if (settings.debug && alive()) AM.debugLog({ provider: adapter ? adapter.id : host, ...entry });
+    if (!settings.debug || !alive()) return;
+    const clean = { ...entry };
+    if (clean.url) clean.url = AM.redact(clean.url);
+    if (clean.body) clean.body = AM.redact(clean.body);
+    AM.debugLog({ provider: adapter ? adapter.id : host, ...clean });
   };
 
   const ctx = {
@@ -190,9 +194,20 @@
     }, 3000);
   }
 
+  // A broken adapter (it throws, or its parser chokes on a changed response) must not take the pill, the other
+  // handlers or the page down: failures become a visible "can't read usage" problem instead.
+  const failed = (what, e) => {
+    console.warn('[AI Meter]', adapter && adapter.id, what, e);
+    if (adapter) ctx.problem('error', 'AI Meter hit an internal error reading this site (' + what + ')');
+    if (problem) { problem.since = Date.now() - AM.PROBLEM_DELAY_MS; publish(); } // our own failure: show it now, not after the delay
+  };
+  const refreshAdapter = async () => {
+    try { if (adapter && adapter.refresh) await adapter.refresh(); } catch (e) { failed('refresh', e); }
+  };
+
   chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
     if (msg && msg.type === 'aimeter:refresh' && adapter) {
-      Promise.resolve(adapter.refresh && adapter.refresh()).finally(() => reply({ ok: true }));
+      refreshAdapter().finally(() => reply({ ok: true }));
       return true;
     }
   });
@@ -202,7 +217,7 @@
     const wasDebug = settings.debug;
     settings = AM.mergeSettings(changes.settings.newValue);
     if (settings.debug !== wasDebug) checkHook();
-    if (adapter.refresh) adapter.refresh();
+    refreshAdapter();
     publish();
   });
 
@@ -218,8 +233,8 @@
         const { settings: stored } = await AM.storage.get('settings');
         await AM.storage.set({ settings: { ...(stored || {}), [key]: value } });
       };
-      adapter.init(ctx);
-      AM.banner.watch(ctx);
+      try { adapter.init(ctx); } catch (e) { failed('start', e); }
+      try { AM.banner.watch(ctx); } catch (e) { console.warn('[AI Meter] banner', e); }
       pending.splice(0).forEach(handle);
       publish();
       checkHook();
