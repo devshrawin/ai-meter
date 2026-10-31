@@ -2,6 +2,15 @@
 
 All notable changes to AI Meter. Versions follow `manifest.json`.
 
+## Unreleased (1.0.0)
+
+### Fixed
+- Two tabs reporting usage at the same moment could each fire the same threshold notification; usage and reset handling now run one at a time.
+- A reset notification was lost or garbled when a provider name or limit label contained a `|`.
+
+### Tests
+- New suites for the service worker (thresholds, reset, restart), the on-page widget (ok, estimate, can't-read, sign-in, chat stats, drag, Iris mood), content script host and adapter selection (including user-added sites) and Iris's state machine (alarm trips, falls and recovery, reduced motion, hidden tab, pick-up).
+
 ## 0.9.2 — 2026-10-28
 
 ### Changed
