@@ -7,6 +7,7 @@ All notable changes to Headroom (called AI Meter before 1.0.0). Versions follow 
 First store-ready release.
 
 ### Changed
+- **Meter redesign.** The pill, panel and bar follow a new design: every usage level has its own shape as well as its colour (filled dot, half dot, triangle, square, dashed ring), so it reads in greyscale and for colour-blind users; deeper status colours that pass WCAG contrast; three source-tag shapes (solid with a tick for real, dashed with "≈" for estimate, flagged for banner); small gaps at 75% and 90% on every bar and striped fill from 90%; the reset time only shows from "close" up; the cache timer uses the accent colour with a clock; a hairline and soft shadow so the pill separates on dark and busy pages. The bar style shows a label chip in the middle on hover or focus and grows from 6 to 10 px.
 - **Renamed from AI Meter to Headroom.** New name in the extension, popup, settings, first-run guide, notifications, privacy policy, store listing and README. Internal identifiers and saved data are unchanged.
 - **New Iris art.** Redrawn sprite pack: clearer worried and stressed faces, a soft lavender edge so she stands out on white pages, and a smooth 12-frame walk cycle. Fur colour and size are matched across every pose.
 - Popup is one collapsible line per service (0.9.2) with a lavender look and dark mode (0.9.1).

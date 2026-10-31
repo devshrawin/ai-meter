@@ -56,6 +56,7 @@ export function makeDocument() {
   const doc = { listeners: {} };
   doc.body = new FakeEl('body', doc);
   doc.createElement = (tag) => new FakeEl(tag, doc);
+  doc.createElementNS = (ns, tag) => new FakeEl(tag, doc);
   doc.addEventListener = (t, fn) => { (doc.listeners[t] = doc.listeners[t] || []).push(fn); };
   doc.elementsFromPoint = () => [];
   doc.visibilityState = 'visible';
@@ -98,7 +99,7 @@ export function loadWidget({ settings = {}, pet = false } = {}) {
     get root() { return this.host && this.host.shadow; },
     pill() { return this.root.byClass('pill')[0]; },
     pillText() { return this.pill().byClass('info')[0].textContent; },
-    dotClass() { return this.pill().byClass('dot')[0].className; },
+    dotClass() { return this.pill().byClass('glyph')[0].className; },
     click() { const p = this.pill(); p.fire('pointerdown'); p.fire('pointerup'); },
     panelText() { const p = this.root.byClass('panel')[0]; return p ? p.textContent : null; },
   };
