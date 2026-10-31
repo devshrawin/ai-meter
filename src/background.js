@@ -44,12 +44,13 @@ async function checkThresholds(entry, settings) {
       });
     }
     if (pct >= 90 && m.resetAt && m.resetAt > Date.now() + 30e3) {
-      chrome.alarms.create(`reset|${entry.provider}|${m.id}|${entry.name}|${m.label}`, { when: m.resetAt });
+      chrome.alarms.create(['reset', entry.provider, m.id, entry.name, m.label].map(encodeURIComponent).join('|'), { when: m.resetAt });
     }
   }
   if (changed) await chrome.storage.local.set({ notified });
 }
 
+let queue = Promise.resolve();
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg && msg.type === 'aimeter:loadPet') {
     // Inject Iris's engine and frames into the asking frame's content-script world (the same one widget.js runs in).
@@ -60,29 +61,32 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true; // async response
   }
   if (!msg || msg.type !== 'aimeter:usage') return;
-  (async () => {
+  // One at a time: two tabs reporting together would otherwise both read "notified" before either wrote it back.
+  queue = queue.then(async () => {
     const entry = { provider: msg.provider, name: msg.name, meters: msg.meters || [], problem: msg.problem || null, updatedAt: Date.now() };
     await chrome.storage.local.set({ ['usage.' + msg.provider]: entry });
     if (sender.tab && sender.tab.id != null) setBadge(sender.tab.id, entry.meters);
     const settings = await getSettings();
     if (settings.notify) await checkThresholds(entry, settings);
-  })().catch((e) => console.warn('[AI Meter]', e));
+  }).catch((e) => console.warn('[AI Meter]', e));
 });
 
-chrome.alarms.onAlarm.addListener(async (alarm) => {
+chrome.alarms.onAlarm.addListener((alarm) => {
   if (!alarm.name.startsWith('reset|')) return;
-  const [, provider, id, name, label] = alarm.name.split('|');
-  const settings = await getSettings();
-  const { notified = {} } = await chrome.storage.local.get('notified');
-  delete notified[`${provider}|${id}`];
-  await chrome.storage.local.set({ notified });
-  if (!settings.notify) return;
-  chrome.notifications.create(`aimeter|reset|${provider}|${id}|${Date.now()}`, {
-    type: 'basic',
-    iconUrl: ICON,
-    title: `${name}: ${label} has reset`,
-    message: 'You should be good to go again.',
-  });
+  const [, provider, id, name, label] = alarm.name.split('|').map(decodeURIComponent);
+  queue = queue.then(async () => {
+    const settings = await getSettings();
+    const { notified = {} } = await chrome.storage.local.get('notified');
+    delete notified[`${provider}|${id}`];
+    await chrome.storage.local.set({ notified });
+    if (!settings.notify) return;
+    chrome.notifications.create(`aimeter|reset|${provider}|${id}|${Date.now()}`, {
+      type: 'basic',
+      iconUrl: ICON,
+      title: `${name}: ${label} has reset`,
+      message: 'You should be good to go again.',
+    });
+  }).catch((e) => console.warn('[AI Meter]', e));
 });
 
 // Keep dynamic content scripts for user-added sites in step with settings (they can be dropped on update).
