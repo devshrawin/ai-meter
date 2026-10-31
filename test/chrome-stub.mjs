@@ -26,6 +26,7 @@ export function loadBackground({ storage = makeStorage(), contains = async () =>
   const alarms = [];
   const badges = [];
   const registeredScripts = [];
+  const tabsCreated = [];
   const listeners = { message: [], alarm: [], installed: [], startup: [], activated: [] };
   const event = (name) => ({ addListener: (fn) => listeners[name].push(fn) });
   const chrome = {
@@ -37,7 +38,7 @@ export function loadBackground({ storage = makeStorage(), contains = async () =>
       setBadgeText: async (o) => { badges.push({ text: o.text }); },
       setBadgeBackgroundColor: async (o) => { badges.push({ color: o.color }); },
     },
-    tabs: { onActivated: event('activated'), get: async () => ({ url: 'https://claude.ai/chat' }) },
+    tabs: { onActivated: event('activated'), get: async () => ({ url: 'https://claude.ai/chat' }), create: async (o) => { tabsCreated.push(o); } },
     scripting: {
       getRegisteredContentScripts: async () => registered,
       registerContentScripts: async (s) => { registeredScripts.push(...s); },
@@ -52,7 +53,7 @@ export function loadBackground({ storage = makeStorage(), contains = async () =>
 
   const settle = () => new Promise((r) => setTimeout(r, 10));
   return {
-    AM: ctx.AIMeter, notifications, alarms, badges, registeredScripts, listeners, storage, settle,
+    AM: ctx.AIMeter, notifications, alarms, badges, registeredScripts, tabsCreated, listeners, storage, settle,
     // what content.js sends after each refresh
     async usage(provider, name, meters, problem = null, sender = { tab: { id: 1 } }) {
       listeners.message.forEach((fn) => fn({ type: 'aimeter:usage', provider, name, meters, problem }, sender, () => {}));

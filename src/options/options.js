@@ -102,9 +102,11 @@ async function renderLog() {
     : 'Nothing logged yet.';
 }
 
-function flash(msg) {
+let flashTimer = 0;
+function flash(msg, ms = 2500) {
   $('status').textContent = msg;
-  setTimeout(() => ($('status').textContent = ''), 2500);
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => ($('status').textContent = ''), ms);
 }
 
 async function save() {
@@ -190,6 +192,43 @@ async function removeSite(host) {
 }
 
 $('addSite').addEventListener('click', addSite);
+
+$('exportSettings').addEventListener('click', () => {
+  const file = AM.buildExport(settings, chrome.runtime.getManifest().version);
+  const url = URL.createObjectURL(new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'ai-meter-settings-' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  flash('Settings exported.');
+});
+$('importSettings').addEventListener('click', () => $('importFile').click());
+$('importFile').addEventListener('change', async (e) => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  const parsed = AM.parseImport(await f.text());
+  if (!parsed.ok) return flash(parsed.error, 8000);
+  if (!confirm('Replace your current settings with the ones in this file? Your usage numbers are not touched.')) return;
+  // Sites the user already added stay; sites from the file only count if Chrome already trusts them.
+  const have = new Set(settings.customSites.map((x) => x.host));
+  const skipped = [];
+  const sites = [...settings.customSites];
+  for (const site of parsed.sites) {
+    if (have.has(site.host)) continue;
+    if (await chrome.permissions.contains({ origins: ['https://' + site.host + '/*'] })) sites.push(site);
+    else skipped.push(site.host);
+  }
+  settings = AM.mergeSettings({ ...settings, ...parsed.settings, quotas: { ...settings.quotas, ...(parsed.settings.quotas || {}) }, customSites: sites });
+  await chrome.storage.local.set({ settings });
+  renderGeneral();
+  renderSites();
+  renderQuotas();
+  flash(skipped.length ? 'Imported. Add these sites again to track them: ' + skipped.join(', ') : 'Settings imported.', skipped.length ? 12000 : 4000);
+});
 // Iris settings take effect straight away, no Save needed.
 $('irisHome').addEventListener('click', async () => {
   settings = { ...settings, pet: !settings.pet };

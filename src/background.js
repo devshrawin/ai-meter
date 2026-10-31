@@ -102,7 +102,11 @@ async function syncSites() {
     if (missing.length) await chrome.scripting.registerContentScripts(missing).catch((e) => console.warn('[AI Meter]', e));
   }
 }
-chrome.runtime.onInstalled.addListener(() => syncSites().catch(() => {}));
+chrome.runtime.onInstalled.addListener((details) => {
+  syncSites().catch(() => {});
+  // First install only (not updates): show the short "how it works" page.
+  if (details && details.reason === 'install') chrome.tabs.create({ url: chrome.runtime.getURL('src/welcome/welcome.html') }).catch(() => {});
+});
 chrome.runtime.onStartup.addListener(() => syncSites().catch(() => {}));
 
 chrome.tabs.onActivated.addListener(async ({ tabId }) => {

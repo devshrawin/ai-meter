@@ -6,7 +6,7 @@
   "scripts": {
     "test": "node --test",
     "icons": "node scripts/make-icons.mjs",
-    "zip": "powershell -NoProfile -Command \"Compress-Archive -Force -Path manifest.json,src,icons -DestinationPath ai-meter.zip\""
+    "store-zip": "node scripts/build-store-zip.mjs"
   },
   "license": "MIT"
 }

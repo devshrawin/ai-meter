@@ -9,6 +9,11 @@ All notable changes to AI Meter. Versions follow `manifest.json`.
 
 ## Unreleased (1.0.0)
 
+### Added
+- **First-run guide.** A short page opens once on install: what AI Meter reads, how to add a site, and what the real / estimate / banner tags mean. It is also linked from Settings.
+- **Export and import settings.** Save your limits, thresholds and Iris options to a file and load them back. A backup holds settings only. Sites you added need Chrome's permission again, so you add them again after importing.
+- `npm run store-zip` builds the Web Store zip and refuses to if something is wrong.
+
 ### Accessibility
 - The pill is now a real button: focusable, named (it reads out the percentage and reset time), opens with Enter or Space, closes with Escape, and moves with Shift and the arrow keys. The panel is a labelled region and each bar is a progress bar.
 - Text contrast raised to WCAG AA in light mode (links, amber text, REAL / EST tags, stale cards, cache timer). Focus rings everywhere. Animations stop under reduced-motion.

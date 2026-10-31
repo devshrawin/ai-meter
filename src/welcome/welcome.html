@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Welcome to AI Meter</title>
+  <link rel="stylesheet" href="welcome.css">
+</head>
+<body>
+  <main>
+    <header>
+      <img src="../assets/iris/sit-happy.webp" alt="" width="64" height="86">
+      <div>
+        <h1>Welcome to AI Meter</h1>
+        <p class="lead">See how much of your AI usage limit is left, right on the page, before you hit the wall.</p>
+      </div>
+    </header>
+
+    <section aria-labelledby="start">
+      <h2 id="start">Getting started takes no setup</h2>
+      <ol>
+        <li>Open an AI site you already use: Claude, ChatGPT, Gemini, Grok, Perplexity, Kimi, DeepSeek, Qwen, Le Chat, Copilot, Meta AI or Poe.</li>
+        <li>A small pill appears in the corner of the page with your percentage used and when it resets. <b>Click it</b> for the details, drag it to move it, or focus it with the keyboard and press Enter.</li>
+        <li>Click the AI Meter icon in the toolbar to see every service in one place.</li>
+      </ol>
+      <p class="hint">Sign in to the site as you normally do. AI Meter never asks for a password and never signs in for you.</p>
+    </section>
+
+    <section aria-labelledby="tags">
+      <h2 id="tags">Read the tags: real, estimate, banner</h2>
+      <p>Not every site shows usage, so AI Meter tells you where each number comes from.</p>
+      <dl>
+        <dt><span class="tag real">real</span></dt>
+        <dd>The number comes from the provider itself, the same figure the site's own usage page shows. AI Meter reads real numbers for Claude, Gemini, Grok, Perplexity and Kimi (and ChatGPT's Codex usage) wherever the site exposes them.</dd>
+        <dt><span class="tag estimate">estimate</span></dt>
+        <dd>The site shows no usage, so AI Meter <b>counts the messages you send</b> and compares them with a limit. These limits are published figures that change often, so set them to match your plan in Settings.</dd>
+        <dt><span class="tag banner">banner</span></dt>
+        <dd>The site itself told you that you hit a limit (a "limit reached" notice or a rate-limit error), so AI Meter shows it as full until the time the site gives.</dd>
+      </dl>
+    </section>
+
+    <section aria-labelledby="iris">
+      <h2 id="iris">Iris, and the colours</h2>
+      <p>The light on the pill is <b>green</b> under 75%, <b>amber</b> from 75%, and <b>red</b> from 90%. Iris, the cat on the pill, shows the same thing: calm while you have plenty left, worried near the limit, stressed near the end, and asleep when you have run out. She is optional: switch her off in Settings and the meter stays.</p>
+    </section>
+
+    <section aria-labelledby="reads">
+      <h2 id="reads">What it reads, and what it never does</h2>
+      <ul>
+        <li>It reads your usage numbers from the AI sites you use, from your own logged-in tab, and notes <b>that</b> you sent a message and which model, to count them.</li>
+        <li>It <b>never stores the text</b> of your messages, has no server and no account, and sends nothing anywhere except to the site you are already on.</li>
+        <li>Everything is kept on your computer. <a href="https://devshrawin.github.io/ai-meter/privacy" target="_blank" rel="noopener noreferrer">Read the privacy policy</a>.</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="add">
+      <h2 id="add">Another AI site?</h2>
+      <p>Open <a href="../options/options.html">Settings</a>, type the site's address under <b>Other AI sites</b>, and add it. Chrome asks for access to <b>that one site only</b>. AI Meter then counts your sends there and watches for the site's own limit notices.</p>
+    </section>
+
+    <footer>
+      <a class="button" href="../options/options.html">Open Settings</a>
+      <p class="hint">AI Meter is an independent project and is not affiliated with Anthropic, OpenAI, Google, xAI, Perplexity, Moonshot AI, DeepSeek, Alibaba, Mistral AI, Microsoft, Meta or Quora. Names are trademarks of their owners, used only to say which sites AI Meter works with.</p>
+    </footer>
+  </main>
+</body>
+</html>

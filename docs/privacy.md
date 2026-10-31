@@ -5,7 +5,7 @@ permalink: /privacy
 
 # AI Meter privacy policy
 
-Effective 28 October 2026 · Applies to AI Meter 0.9.0 and later
+Effective 31 October 2026 · Applies to AI Meter 0.9.0 and later
 
 **In one paragraph:** AI Meter runs entirely in your browser. It has no server, no account and no analytics, and it sends nothing to its developer or to any third party. It reads your usage from the AI sites you already use, from your own logged-in tab, and keeps the numbers on your machine. It never stores the text of your messages.
 
@@ -21,6 +21,7 @@ AI Meter is a Chrome extension that shows how much of your usage limit is left o
 | **That a message was sent, and which model** | The page's own network request (the request is observed, not changed) | A timestamp and the model name, to count messages. Never the text | No |
 | **Chat length** (for the "This chat" figures) | The number of characters in the open conversation on the page | A character and message count only. Never the text | No |
 | **Your settings** | You | Estimate limits, thresholds, added sites, Iris on or off, in `chrome.storage.local` | No |
+| **A settings backup** (only if you ask for one) | You, with **Export settings** in Settings | A file the browser saves where you choose, holding your settings only: estimate limits, thresholds, Iris options and the addresses of sites you added. No usage numbers, message counts or debug log. Importing reads a file you pick, on your machine | No. Nothing is uploaded; the file stays wherever you put it |
 | **Meter position** | You, when you drag the meter | The pill position, saved under the key `aimeter.pos` in the page's own `localStorage` | No |
 | **Debug log** (off by default) | The extension itself, only if you tick Debug | Key names and short model-like values of requests, full bodies only of usage and limit endpoints, and only the *shape* (keys and types) of anything else. Emails, tokens and long ids in it are masked. Stored locally, capped to the latest entries; clear it any time in Settings | No, unless you choose to copy and paste it yourself |
 
@@ -32,7 +33,8 @@ Being plain about what that means:
 
 - It **sees** each request the page makes, including the body of a message you send, because that is where the model name is.
 - Request and response bodies are held **in memory only for as long as it takes to read the model name or the usage figures**. Message text is **never written to storage**, never logged by the debug log, and never sent anywhere.
-- The bodies of requests to, and responses from, sign-in, session, token, account and profile endpoints are **never forwarded** to the extension at all.
+- The bodies of requests to, and responses from, sign-in, sign-up, password, OAuth, one-time-code, checkout, payment, session, token, account and profile endpoints are **never forwarded** to the extension at all.
+- On any body that is forwarded, the values of fields that look secret (password, token, secret, key, card number, and similar) are masked before the extension sees them. This matters most on a site you add yourself.
 - It only does anything on the sites listed above and on sites you add.
 - It does not change, block or delay any request.
 
@@ -45,6 +47,10 @@ AI Meter does not collect your password or ask you to sign in to anything. Two p
 - **Claude:** the organisation id from the site's `lastActiveOrg` cookie is used to build the usage URL on `claude.ai`.
 
 These values are never written to storage, never put in the debug log and never sent to any other domain.
+
+## First run
+
+When you first install AI Meter it opens a short "how it works" page. That page is part of the extension and loads nothing from the internet apart from a link to this policy that you can click.
 
 ## Where requests go
 

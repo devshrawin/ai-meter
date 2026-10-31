@@ -308,6 +308,60 @@
     return { provider: m.provider, name: m.name, meters, problem };
   };
 
+  // ---- settings backup (Export / Import in Settings) ----
+  // A backup holds settings only: never usage numbers, message counts, the debug log or anything from a provider.
+  AM.buildExport = (settings, version, now = new Date()) => {
+    const s = AM.mergeSettings(settings);
+    const keep = {};
+    for (const k of ['widget', 'chatStats', 'pet', 'irisEnergy', 'explore', 'notify', 'thresholds', 'debug', 'quotas', 'customSites']) keep[k] = s[k];
+    return { app: 'ai-meter', format: 1, version: version || '', exportedAt: now.toISOString(), settings: keep };
+  };
+
+  // Everything in a file the user picked is untrusted: rebuilt field by field with type and size checks.
+  // Returns { ok: true, settings, sites } or { ok: false, error }. `sites` are the added sites in the file; the caller
+  // decides which to keep, because a site needs Chrome's permission, which only the user can grant.
+  AM.parseImport = (text) => {
+    const fail = (error) => ({ ok: false, error });
+    if (typeof text !== 'string' || text.length > 200000) return fail('That file is too large to be an AI Meter backup.');
+    let j;
+    try { j = JSON.parse(text); } catch { return fail('That is not a valid JSON file.'); }
+    if (!j || typeof j !== 'object' || j.app !== 'ai-meter' || !j.settings || typeof j.settings !== 'object' || Array.isArray(j.settings)) {
+      return fail('That file is not an AI Meter backup.');
+    }
+    const s = j.settings;
+    const num = (v) => typeof v === 'number' && isFinite(v);
+    const out = {};
+    for (const k of ['widget', 'chatStats', 'pet', 'explore', 'notify', 'debug']) if (typeof s[k] === 'boolean') out[k] = s[k];
+    if (s.irisEnergy === 'calm' || s.irisEnergy === 'lively') out.irisEnergy = s.irisEnergy;
+    if (Array.isArray(s.thresholds)) {
+      const t = s.thresholds.filter((n) => num(n) && n > 0 && n <= 100).slice(0, 10);
+      if (t.length) out.thresholds = t;
+    }
+    if (s.quotas && typeof s.quotas === 'object' && !Array.isArray(s.quotas)) {
+      const quotas = {};
+      for (const [id, rules] of Object.entries(s.quotas)) {
+        if (!/^[A-Za-z0-9:._-]{1,100}$/.test(id) || id === '__proto__' || !Array.isArray(rules) || rules.length > 30) continue;
+        const clean = [];
+        for (const r of rules) {
+          if (!r || typeof r !== 'object' || typeof r.id !== 'string' || r.id.length > 100 || typeof r.label !== 'string' || r.label.length > 100) continue;
+          if (typeof r.pattern !== 'string' || r.pattern.length > 200 || !num(r.limit) || r.limit < 0 || r.limit > 1e7 || !num(r.windowHours) || r.windowHours <= 0 || r.windowHours > 24 * 365) continue;
+          try { new RegExp(r.pattern); } catch { continue; }
+          clean.push({ id: r.id, label: r.label, pattern: r.pattern, limit: r.limit, windowHours: r.windowHours });
+        }
+        quotas[id] = clean;
+      }
+      out.quotas = quotas;
+    }
+    const sites = [];
+    if (Array.isArray(s.customSites)) {
+      for (const x of s.customSites.slice(0, 50)) {
+        if (!x || typeof x.host !== 'string' || !/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(x.host) || x.host.length > 253) continue;
+        sites.push({ host: x.host, limit: num(x.limit) && x.limit >= 0 ? x.limit : 0, windowHours: num(x.windowHours) && x.windowHours > 0 ? x.windowHours : 24 });
+      }
+    }
+    return { ok: true, settings: out, sites };
+  };
+
   // ---- "can't read usage here" ----
   // An adapter reports a problem when its usage call fails or its parser finds nothing. Transient errors
   // (the page hasn't made its own calls yet) must not flash a warning, so an 'error' only shows once it has

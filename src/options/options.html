@@ -9,6 +9,7 @@
 <body>
   <main>
     <h1>AI Meter settings</h1>
+    <p class="hint"><a href="../welcome/welcome.html">How AI Meter works</a> · what it reads, what the real / estimate / banner tags mean, and how to add a site.</p>
 
     <section>
       <h2>General</h2>
@@ -36,7 +37,7 @@
       </div>
     </section>
 
-    <section>
+    <section id="other-sites">
       <h2>Other AI sites</h2>
       <p class="hint">Add any AI chat site that isn't built in. Chrome asks for access to that one site only. AI Meter then
         counts your sends there (estimate), and watches for the site's own limit notices and rate-limit errors.</p>
@@ -64,6 +65,16 @@
     </div>
 
     <section>
+      <h2>Back up your settings</h2>
+      <p class="hint">Save your estimate limits, thresholds and Iris options to a file, or load them back (on a new computer, or after reinstalling). A backup holds settings only: no usage numbers, no message counts, no debug log. Sites you added need Chrome's permission again, so use <b>Add site</b> for those after importing.</p>
+      <div class="save-row">
+        <button id="exportSettings" type="button">Export settings</button>
+        <button id="importSettings" type="button">Import settings…</button>
+        <input type="file" id="importFile" accept="application/json,.json" hidden>
+      </div>
+    </section>
+
+    <section>
       <h2>Debug</h2>
       <label class="check"><input type="checkbox" id="debug"> Log limit-related network responses (for checking endpoints)</label>
       <p class="hint">Stores the last 60 matching requests/responses locally. Request bodies (your prompts) are never stored.</p>
@@ -76,6 +87,7 @@
     </section>
   </main>
   <script src="../core/quotas.js"></script>
+  <script src="../core/common.js"></script>
   <script src="options.js"></script>
 </body>
 </html>
