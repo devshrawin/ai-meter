@@ -2,6 +2,11 @@
 
 All notable changes to AI Meter. Versions follow `manifest.json`.
 
+## 0.10.0 — 2026-10-31
+
+### Changed
+- **New Iris art.** Redrawn sprite pack: clearer worried/stressed faces, a soft lavender edge so she stands out on white pages, and a smooth 12-frame walk cycle. Fur colour and size are matched across every pose.
+
 ## Unreleased (1.0.0)
 
 ### Fixed

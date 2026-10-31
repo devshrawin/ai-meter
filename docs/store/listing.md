@@ -9,7 +9,7 @@ Everything below is written to paste into the Chrome Web Store developer dashboa
 | Name | AI Meter: AI usage limit tracker |
 | Category | Productivity |
 | Language | English |
-| Package version | 0.9.2 |
+| Package version | 0.10.0 |
 | Privacy policy URL | `https://devshrawin.github.io/ai-meter/privacy` (publish `docs/privacy.md` with GitHub Pages: Settings → Pages → Deploy from branch → `main` / `/docs`) |
 | Support URL | `https://github.com/devshrawin/ai-meter/issues` |
 | Homepage URL | `https://github.com/devshrawin/ai-meter` |
@@ -136,7 +136,7 @@ Promo tile: the AI Meter icon, "AI Meter", and the line "Know your limit before 
 
 ## Before you submit
 
-- [ ] `manifest.json` and `package.json` both say 0.9.2
+- [ ] `manifest.json` and `package.json` both say 0.10.0
 - [ ] Zip contains only `manifest.json`, `src/`, `icons/` (`npm run zip`)
 - [ ] Privacy policy URL is live and loads without sign-in
 - [ ] Single-purpose statement and every permission justification pasted
