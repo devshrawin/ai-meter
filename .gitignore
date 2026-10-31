@@ -10,3 +10,5 @@ tools/site-smoke/dist/
 brag-output/
 .smoke-frames/
 tools/popup-preview/index.html
+tools/a11y-preview/widget.html
+tools/a11y-preview/options.html

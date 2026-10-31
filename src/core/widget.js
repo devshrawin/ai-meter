@@ -9,12 +9,13 @@
     * { box-sizing: border-box; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
     .wrap { --bg: #ffffff; --fg: #1f1d2b; --muted: #77738a; --line: #e6e3ef; --track: #eeecf5;
       --low: #22c55e; --mid: #f59e0b; --high: #ef4444; --none: #7aa7ff;
-      --glass: rgba(255,255,255,.86);
+      --glass: rgba(255,255,255,.94);
+      --warn-text: #b45309; --ok-text: #15803d; --accent-text: #6f52c9;
       --cap-hi: #ffffff; --cap-mid: #f7f6fc; --cap-lo: #ebe8f5; --cap-lip: #d8d3ec; --cap-edge: #e4e0f0;
-      display: flex; flex-direction: column; align-items: flex-end; gap: 6px; color: var(--fg); }
+      display: flex; flex-direction: column-reverse; align-items: flex-end; gap: 6px; color: var(--fg); }
     .wrap.with-pet { gap: 74px; padding-top: 70px; }
     @media (prefers-color-scheme: dark) {
-      .wrap { --bg: #1d1c24; --fg: #f3f2f8; --muted: #a09cb4; --line: #34313f; --track: #2c2a36; --glass: rgba(30,29,38,.86);
+      .wrap { --bg: #1d1c24; --fg: #f3f2f8; --muted: #a09cb4; --line: #34313f; --track: #2c2a36; --glass: rgba(30,29,38,.94); --warn-text: #f59e0b; --ok-text: #22c55e; --accent-text: #9a80e0;
         --cap-hi: #34323f; --cap-mid: #26252f; --cap-lo: #1e1d26; --cap-lip: #14131a; --cap-edge: #3a3747; }
     }
     /* Glossy capsule: pearl gloss on top, lavender lip underneath, soft lift shadow. */
@@ -30,6 +31,7 @@
     @media (prefers-color-scheme: dark) { .pill::before { background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,0)); } }
     .pill:hover { box-shadow: inset 0 1px 0 rgba(255,255,255,.9), inset 0 -3px 0 var(--cap-lip), 0 10px 22px -6px rgba(70,60,130,.34), 0 2px 4px rgba(40,30,80,.1); }
     .pill:active { cursor: grabbing; }
+    .pill:focus-visible, .problem button:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
     .info { position: relative; display: flex; align-items: center; gap: 7px; }
     /* Status LED: glows in the usage colour. */
     .dot { position: relative; width: 16px; height: 5px; border-radius: 3px; flex: none; background: var(--none);
@@ -39,7 +41,7 @@
     @keyframes led-pulse { 50% { opacity: .55; } }
     .muted { color: var(--muted); }
     .dot.warn { --none: #a09cb4; }
-    .warn-flag { color: var(--mid); font-weight: 700; }
+    .warn-flag { color: var(--warn-text); font-weight: 700; }
     .problem { margin: 2px 0 8px; padding: 8px 10px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--mid) 45%, var(--line));
       background: color-mix(in srgb, var(--mid) 9%, transparent); }
     .problem b { display: block; font-size: 12px; margin-bottom: 2px; }
@@ -50,7 +52,7 @@
     .panel { width: 280px; padding: 12px 14px; border-radius: 16px; background: var(--glass);
       backdrop-filter: blur(14px) saturate(1.3); -webkit-backdrop-filter: blur(14px) saturate(1.3);
       border: 1px solid var(--line); box-shadow: 0 16px 40px -12px rgba(50,40,110,.32), 0 2px 6px rgba(0,0,0,.06); font-size: 12px; }
-    .panel h4 { margin: 0 0 8px; font-size: 13px; font-weight: 650; display: flex; justify-content: space-between; align-items: baseline; }
+    .panel .h { margin: 0 0 8px; font-size: 13px; font-weight: 650; display: flex; justify-content: space-between; align-items: baseline; }
     .row { margin: 9px 0; }
     .row .top { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 5px; }
     .bar { height: 6px; border-radius: 4px; background: var(--track); overflow: hidden; }
@@ -62,7 +64,7 @@
     .tag { font-size: 10px; padding: 1px 5px; border-radius: 4px; border: 1px solid var(--line); color: var(--muted); }
     .empty { color: var(--muted); }
     .sep { width: 1px; height: 12px; background: var(--line); }
-    .cache.on { color: var(--low); } .cache.soon { color: var(--mid); } .cache.off { color: var(--muted); }
+    .cache.on { color: var(--ok-text); } .cache.soon { color: var(--warn-text); } .cache.off { color: var(--muted); }
     .chat { margin: 2px 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
     .chat-h { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
     .kv { display: flex; justify-content: space-between; gap: 8px; margin: 3px 0; }
@@ -74,10 +76,14 @@
       padding: 3px 12px 3px 3px; cursor: pointer; transition: background .15s, border-color .15s, transform .1s; }
     .iris-btn:hover { background: color-mix(in srgb, #9a80e0 14%, var(--track)); border-color: color-mix(in srgb, #9a80e0 45%, var(--line)); }
     .iris-btn:active { transform: scale(.97); }
-    .iris-btn:focus-visible { outline: 2px solid #9a80e0; outline-offset: 2px; }
+    .iris-btn:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
     .iris-face { width: 22px; height: 22px; object-fit: cover; object-position: 50% 12%; border-radius: 50%;
       background: #fff; border: 1px solid var(--line); transition: filter .2s, opacity .2s; }
     .iris-btn.away .iris-face { filter: grayscale(1); opacity: .6; }
+    @media (prefers-reduced-motion: reduce) {
+      .dot.high { animation: none; }
+      .pill, .fill, .iris-btn, .iris-face { transition: none; }
+    }
   `;
 
   let host = null;
@@ -178,11 +184,16 @@
     panelBox = el('div');
     pill = el('div', 'pill');
     pill.title = 'AI Meter — click for details, drag to move';
+    pill.setAttribute('role', 'button');
+    pill.tabIndex = 0;
+    pill.setAttribute('aria-expanded', 'false');
     dot = el('span', 'dot');
+    dot.setAttribute('aria-hidden', 'true');
     info = el('span', 'info');
     pill.append(dot, info);
     attachDrag(pill);
-    wrap.append(panelBox, pill);
+    attachKeys(pill);
+    wrap.append(pill, panelBox);
     root.append(style, wrap);
     document.body.appendChild(host);
     petOn = false;
@@ -240,6 +251,32 @@
     });
   }
 
+  function attachKeys(target) {
+    target.addEventListener('keydown', (e) => {
+      if (e.target !== target) return;
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        expanded = !expanded;
+        render();
+      } else if (e.key === 'Escape' && expanded) {
+        e.preventDefault();
+        expanded = false;
+        render();
+      } else if (e.shiftKey && /^Arrow(Left|Right|Up|Down)$/.test(e.key)) {
+        e.preventDefault();
+        const step = 16;
+        const cur = { right: parseFloat(host.style.right) || 0, bottom: parseFloat(host.style.bottom) || 0 };
+        const dx = e.key === 'ArrowLeft' ? step : e.key === 'ArrowRight' ? -step : 0;
+        const dy = e.key === 'ArrowUp' ? step : e.key === 'ArrowDown' ? -step : 0;
+        const right = Math.max(0, Math.min(innerWidth - 60, cur.right + dx));
+        const bottom = Math.max(0, Math.min(innerHeight - 30, cur.bottom + dy));
+        host.style.right = right + 'px';
+        host.style.bottom = bottom + 'px';
+        savePos({ right, bottom });
+      }
+    });
+  }
+
   function cacheState(chat, now) {
     const left = chat.cachedUntil ? chat.cachedUntil - now : null;
     if (left == null) return { cls: 'off', short: 'no cache', long: 'Not cached' };
@@ -273,11 +310,13 @@
   function problemBox(p) {
     const d = AM.describeProblem(p);
     const box = el('div', 'problem');
+    box.setAttribute('role', 'status');
     box.append(el('b', null, d.title), el('div', 'why', d.detail));
     if (AM.copyDiagnostics) {
       const btn = el('button', null, 'Copy debug log');
       btn.type = 'button';
       btn.title = 'Copies what AI Meter saw on this page (request addresses and shapes, never message text)';
+      btn.setAttribute('aria-live', 'polite');
       btn.addEventListener('click', async () => {
         const ok = await AM.copyDiagnostics();
         btn.textContent = ok ? 'Copied ✓' : 'Copy failed';
@@ -292,7 +331,12 @@
     panelBox.textContent = '';
     if (!expanded) return;
     const panel = el('div', 'panel');
-    const h = el('h4');
+    panel.setAttribute('role', 'region');
+    panel.setAttribute('aria-label', last.name + ' usage details');
+    const h = el('div');
+    h.className = 'h';
+    h.setAttribute('role', 'heading');
+    h.setAttribute('aria-level', '2');
     h.append(el('span', null, last.name), el('span', 'muted', 'AI Meter'));
     panel.append(h);
     if (last.chat) panel.append(chatSection(last.chat, now));
@@ -304,6 +348,14 @@
       const t = el('div', 'top');
       t.append(el('span', null, m.label), el('span', null, AM.meterValue(m)));
       const bar = el('div', 'bar');
+      if (pct != null) {
+        bar.setAttribute('role', 'progressbar');
+        bar.setAttribute('aria-label', m.label);
+        bar.setAttribute('aria-valuemin', '0');
+        bar.setAttribute('aria-valuemax', '100');
+        bar.setAttribute('aria-valuenow', String(Math.round(pct)));
+        bar.setAttribute('aria-valuetext', AM.meterValue(m) + (AM.resetText(m, now) ? ', ' + AM.resetText(m, now) : ''));
+      } else bar.setAttribute('aria-hidden', 'true');
       const fill = el('div', 'fill ' + AM.level(pct));
       fill.style.width = (pct ?? 0) + '%';
       bar.append(fill);
@@ -336,6 +388,18 @@
     const topPct = top ? AM.pctOf(top) : null;
     renderPanel(meters, now);
 
+    pill.setAttribute('aria-expanded', String(expanded));
+    {
+      let say;
+      if (!top) say = last.problem ? AM.describeProblem(last.problem).title : 'no usage data yet';
+      else {
+        say = topPct != null ? Math.round(topPct) + '% used' : AM.meterValue(top);
+        const left = top.resetAt ? AM.formatDuration(top.resetAt - now) : '';
+        if (left) say += ', resets in ' + left;
+        if (last.problem) say += '. ' + AM.describeProblem(last.problem).title;
+      }
+      pill.setAttribute('aria-label', last.name + ': ' + say + '. ' + (expanded ? 'Hide details' : 'Show details'));
+    }
     dot.className = 'dot ' + (last.problem && !top ? 'warn' : AM.level(topPct));
     info.textContent = '';
     if (!top) {
@@ -348,10 +412,13 @@
     if (last.problem && top) {
       const flag = el('span', 'warn-flag', '!');
       flag.title = AM.describeProblem(last.problem).title;
+      flag.setAttribute('aria-hidden', 'true');
       info.append(flag);
     }
     if (last.chat) {
-      info.append(el('span', 'sep'), el('span', null, AM.fmtTokens(last.chat.tokens) + ' tok'));
+      const sep = el('span', 'sep');
+      sep.setAttribute('aria-hidden', 'true');
+      info.append(sep, el('span', null, AM.fmtTokens(last.chat.tokens) + ' tok'));
       if (hasCache(last.chat)) {
         const c = cacheState(last.chat, now);
         info.append(el('span', 'cache ' + c.cls, c.short));

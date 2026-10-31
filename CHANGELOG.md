@@ -9,6 +9,11 @@ All notable changes to AI Meter. Versions follow `manifest.json`.
 
 ## Unreleased (1.0.0)
 
+### Accessibility
+- The pill is now a real button: focusable, named (it reads out the percentage and reset time), opens with Enter or Space, closes with Escape, and moves with Shift and the arrow keys. The panel is a labelled region and each bar is a progress bar.
+- Text contrast raised to WCAG AA in light mode (links, amber text, REAL / EST tags, stale cards, cache timer). Focus rings everywhere. Animations stop under reduced-motion.
+- Popup keeps keyboard focus across refreshes. Settings: every field is labelled, messages are announced, and the Iris options are disabled while she is at home. Review: `docs/a11y-review-2026-10-31.md`.
+
 ### Security
 - Sign-in, password, OAuth, MFA, checkout and payment requests are never read by the page hook, and secret-looking fields (password, token, key, card number) are masked in any body it does forward. This matters on sites you add yourself.
 - The debug log and "Copy debug log" mask emails, bearer tokens, JWTs, ids and long opaque strings.

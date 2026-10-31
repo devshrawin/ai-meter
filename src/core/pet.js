@@ -55,6 +55,7 @@
     const el = document.createElement('div');
     el.className = 'pet';
     el.title = 'Iris — click to pet';
+    el.setAttribute('aria-hidden', 'true');
     const shadow = document.createElement('div');
     shadow.className = 'shadow';
     const rig = document.createElement('div');

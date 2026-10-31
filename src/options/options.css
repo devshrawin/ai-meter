@@ -27,11 +27,13 @@ button { font: inherit; font-size: 13px; padding: 5px 12px; border-radius: 8px; 
 button:hover { border-color: var(--accent); }
 button.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
 button.x { padding: 2px 8px; }
+button:focus-visible, input:focus-visible, select:focus-visible, pre:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 .save-row input { width: auto; flex: 1 1 140px; }
 .iris-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 10px;
   padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
 #irisStatus { font-size: 13px; }
-#irisOpts.off { opacity: .45; pointer-events: none; }
+#irisOpts.off { opacity: .6; pointer-events: none; }
 select { font: inherit; font-size: 13px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px;
   background: var(--bg); color: var(--fg); margin-left: 6px; }
 #sites { list-style: none; padding: 0; margin: 0; }
@@ -41,3 +43,5 @@ select { font: inherit; font-size: 13px; padding: 4px 6px; border: 1px solid var
 #status { color: var(--muted); font-size: 13px; }
 pre { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 11.5px;
   max-height: 360px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

@@ -38,6 +38,12 @@ function barRow(m, now, mixed) {
   if (!/%$/.test(value)) val.append(' · ' + value);
   top.append(el('span', 'name', m.label), val);
   const bar = el('div', 'bar');
+  bar.setAttribute('role', 'progressbar');
+  bar.setAttribute('aria-label', m.label);
+  bar.setAttribute('aria-valuemin', '0');
+  bar.setAttribute('aria-valuemax', '100');
+  bar.setAttribute('aria-valuenow', String(Math.round(pct)));
+  bar.setAttribute('aria-valuetext', value);
   const fill = el('div', 'fill ' + AM.level(pct));
   fill.style.width = Math.min(100, pct) + '%';
   bar.append(fill);
@@ -56,6 +62,7 @@ function problemBox(entry, prob, all) {
   box.append(el('b', null, d.title), el('div', 'why', d.detail));
   const btn = el('button', null, 'Copy debug log');
   btn.type = 'button';
+  btn.setAttribute('aria-live', 'polite');
   btn.addEventListener('click', async () => {
     const text = AM.buildDiagnostics({ version: chrome.runtime.getManifest().version, provider: entry.provider, host: '', problem: prob, meters: entry.meters, log: all['debug.log'] || [] });
     try { await navigator.clipboard.writeText(text); btn.textContent = 'Copied ✓'; } catch { btn.textContent = 'Copy failed'; }
@@ -81,22 +88,28 @@ const openCards = new Set();
 function card(entry, all, now) {
   const stale = AM.isStale(entry, now);
   const c = el('details', 'card' + (stale ? ' stale' : ''));
+  c.dataset.provider = entry.provider;
   c.open = openCards.has(entry.provider);
   c.addEventListener('toggle', () => { if (c.open) openCards.add(entry.provider); else openCards.delete(entry.provider); });
   const prob = AM.problemToShow(entry.problem, entry.meters);
   const primary = AM.primaryMeter(entry.meters);
   const head = el('summary', 'card-head');
-  head.append(el('span', 'led ' + (prob || stale ? 'none' : AM.level(primary ? AM.pctOf(primary) : null))), el('h2', null, entry.name));
+  const led = el('span', 'led ' + (prob || stale ? 'none' : AM.level(primary ? AM.pctOf(primary) : null)));
+  led.setAttribute('aria-hidden', 'true');
+  head.append(led, el('h2', null, entry.name));
   const h = headline(entry, prob, stale);
   head.append(el('span', 'line', h.text));
   if (h.pct != null) {
     const bar = el('span', 'mini');
+    bar.setAttribute('aria-hidden', 'true');
     const fill = el('i', 'fill ' + AM.level(h.pct));
     fill.style.width = Math.min(100, h.pct) + '%';
     bar.append(fill);
     head.append(bar);
   }
-  head.append(el('span', 'chev'));
+  const chev = el('span', 'chev');
+  chev.setAttribute('aria-hidden', 'true');
+  head.append(chev);
   c.append(head);
 
   const body = el('div', 'body');
@@ -133,6 +146,8 @@ async function render() {
   };
   const now = Date.now();
   const entries = AM.sortEntries(Object.keys(all).filter((k) => k.startsWith('usage.')).map((k) => all[k]), order, now);
+  const focused = document.activeElement;
+  const keep = focused && focused.tagName === 'SUMMARY' && focused.parentElement && focused.parentElement.dataset ? focused.parentElement.dataset.provider : null;
   list.textContent = '';
   if (!entries.length) {
     summary.textContent = 'Nothing tracked yet';
@@ -144,10 +159,14 @@ async function render() {
   const fresh = entries.filter((e) => !AM.isStale(e, now)).length;
   summary.textContent = `${entries.length} ${entries.length === 1 ? 'service' : 'services'} · ${fresh} up to date`;
   for (const entry of entries) list.append(card(entry, all, now));
+  if (keep) {
+    const again = [...list.querySelectorAll('details.card')].find((d) => d.dataset.provider === keep);
+    if (again) again.querySelector('summary').focus();
+  }
 }
 
 document.getElementById('settings').addEventListener('click', () => chrome.runtime.openOptionsPage());
-document.getElementById('add').addEventListener('click', (e) => { e.preventDefault(); chrome.runtime.openOptionsPage(); });
+document.getElementById('add').addEventListener('click', () => chrome.runtime.openOptionsPage());
 document.getElementById('refresh').addEventListener('click', async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (tab && tab.id != null) {

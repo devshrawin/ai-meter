@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AI Meter Settings</title>
   <link rel="stylesheet" href="options.css">
 </head>
@@ -14,14 +15,14 @@
       <label class="check"><input type="checkbox" id="widget"> Show on-page meter</label>
       <label class="check"><input type="checkbox" id="chatStats"> Show chat length, cache timer and next-message cost (Claude, ChatGPT, Gemini)</label>
       <label class="check"><input type="checkbox" id="notify"> Desktop notifications at
-        <input type="text" id="thresholds" size="12"> % (comma separated) and on reset</label>
+        <input type="text" id="thresholds" size="12" aria-label="Notification thresholds in percent, comma separated"> % (comma separated) and on reset</label>
     </section>
 
     <section>
       <h2>Iris</h2>
       <p class="hint">Iris is the cat who lives on the meter. Her mood follows your usage; click her and she reacts.</p>
       <div class="iris-row">
-        <span id="irisStatus"></span>
+        <span id="irisStatus" role="status"></span>
         <button id="irisHome"></button>
       </div>
       <div id="irisOpts">
@@ -40,9 +41,9 @@
       <p class="hint">Add any AI chat site that isn't built in. Chrome asks for access to that one site only. AI Meter then
         counts your sends there (estimate), and watches for the site's own limit notices and rate-limit errors.</p>
       <div class="save-row">
-        <input type="text" id="siteHost" placeholder="chat.example.com">
-        <input type="number" id="siteLimit" placeholder="Limit (0 = just count)" min="0">
-        <input type="number" id="siteWindow" placeholder="Window (h)" min="0.1" step="0.5">
+        <input type="text" id="siteHost" placeholder="chat.example.com" aria-label="Site address, for example chat.example.com" autocomplete="off">
+        <input type="number" id="siteLimit" placeholder="Limit (0 = just count)" min="0" aria-label="Message limit, 0 means just count">
+        <input type="number" id="siteWindow" placeholder="Window (h)" min="0.1" step="0.5" aria-label="Window in hours">
         <button id="addSite">Add site</button>
       </div>
       <ul id="sites"></ul>
@@ -59,7 +60,7 @@
     <div class="save-row">
       <button id="save" class="primary">Save</button>
       <button id="defaults">Restore defaults</button>
-      <span id="status"></span>
+      <span id="status" role="status" aria-live="polite"></span>
     </div>
 
     <section>
@@ -71,7 +72,7 @@
         <button id="clearLog">Clear log</button>
         <button id="clearData">Reset all usage data</button>
       </div>
-      <pre id="log"></pre>
+      <pre id="log" tabindex="0" aria-label="Debug log"></pre>
     </section>
   </main>
   <script src="../core/quotas.js"></script>

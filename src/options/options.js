@@ -24,11 +24,12 @@ function ruleRow(rule) {
     tr.append(td);
     return input;
   };
-  cell(el('input', { type: 'text', value: rule.label, dataset: { f: 'label' } }));
-  cell(el('input', { type: 'text', value: rule.pattern, dataset: { f: 'pattern' } }));
-  cell(el('input', { type: 'number', min: 0, value: rule.limit, dataset: { f: 'limit' } }), 'num');
-  cell(el('input', { type: 'number', min: 0.1, step: 0.5, value: rule.windowHours, dataset: { f: 'windowHours' } }), 'num');
-  const del = el('button', { className: 'x', title: 'Remove rule' }, '×');
+  const who = rule.label || 'rule';
+  cell(el('input', { type: 'text', value: rule.label, dataset: { f: 'label' }, ariaLabel: who + ' label' }));
+  cell(el('input', { type: 'text', value: rule.pattern, dataset: { f: 'pattern' }, ariaLabel: who + ' model pattern' }));
+  cell(el('input', { type: 'number', min: 0, value: rule.limit, dataset: { f: 'limit' }, ariaLabel: who + ' limit' }), 'num');
+  cell(el('input', { type: 'number', min: 0.1, step: 0.5, value: rule.windowHours, dataset: { f: 'windowHours' }, ariaLabel: who + ' window in hours' }), 'num');
+  const del = el('button', { className: 'x', title: 'Remove rule', type: 'button', ariaLabel: 'Remove ' + who }, '×');
   del.addEventListener('click', () => tr.remove());
   cell(del);
   tr.dataset.id = rule.id;
@@ -41,13 +42,13 @@ function renderQuotas() {
   for (const { id: pid, name } of editable()) {
     box.append(el('h3', {}, name));
     const wrap = el('div', { className: 'table' });
-    const table = el('table', { dataset: { provider: pid } });
+    const table = el('table', { dataset: { provider: pid }, ariaLabel: name + ' estimate rules' });
     const head = el('tr');
-    ['Label', 'Model pattern (regex)', 'Limit', 'Window (h)', ''].forEach((h) => head.append(el('th', {}, h)));
+    ['Label', 'Model pattern (regex)', 'Limit', 'Window (h)', 'Remove'].forEach((h, i) => { const th = el('th', { scope: 'col' }, h); if (i === 4) th.className = 'sr-only'; head.append(th); });
     table.append(head);
     (settings.quotas[pid] || AM.defaultQuotasFor(pid, settings)).forEach((r) => table.append(ruleRow(r)));
     wrap.append(table);
-    const add = el('button', {}, '+ Add rule');
+    const add = el('button', { type: 'button', ariaLabel: 'Add a rule for ' + name }, '+ Add rule');
     add.addEventListener('click', () => {
       const last = table.querySelector('tr:last-child');
       const row = ruleRow({ id: 'rule-' + Date.now(), label: 'New rule', pattern: '', limit: 0, windowHours: 24 });
@@ -87,6 +88,8 @@ function renderGeneral() {
   $('irisStatus').textContent = settings.pet ? 'Iris is on the meter.' : 'Iris is at home.';
   $('irisHome').textContent = settings.pet ? 'Send Iris home' : 'Bring Iris back';
   $('irisOpts').classList.toggle('off', !settings.pet);
+  $('irisEnergy').disabled = !settings.pet;
+  $('explore').disabled = !settings.pet;
   $('notify').checked = settings.notify;
   $('debug').checked = settings.debug;
   $('thresholds').value = settings.thresholds.join(', ');
@@ -135,7 +138,7 @@ function renderSites() {
   for (const s of settings.customSites) {
     const li = el('li');
     li.append(el('b', {}, s.host), el('span', {}, s.limit ? `${s.limit} per ${s.windowHours}h` : `counting, ${s.windowHours}h window`));
-    const del = el('button', { className: 'x', title: 'Remove site' }, '×');
+    const del = el('button', { className: 'x', title: 'Remove site', type: 'button', ariaLabel: 'Remove ' + s.host }, '×');
     del.addEventListener('click', () => removeSite(s.host));
     li.append(del);
     ul.append(li);

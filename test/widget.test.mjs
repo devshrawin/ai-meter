@@ -206,3 +206,58 @@ test('if Iris cannot load, the pill works without her', async () => {
   assert.match(w.pillText(), /10%/);
   assert.equal(w.root.byClass('wrap')[0].classList.contains('with-pet'), false);
 });
+
+// ---------- accessibility ----------
+
+test('a11y: the pill is a named, focusable button whose label speaks the numbers and the state', () => {
+  const w = loadWidget();
+  w.update('Claude', [real(32, { resetAt: Date.now() + 3 * hour + 12 * 60e3 })]);
+  const pill = w.pill();
+  assert.equal(pill.attrs.role, 'button');
+  assert.equal(pill.tabIndex, 0);
+  assert.equal(pill.attrs['aria-expanded'], 'false');
+  assert.match(pill.attrs['aria-label'], /^Claude: 32% used, resets in 3h 1\dm\. Show details$/);
+  w.click();
+  assert.equal(pill.attrs['aria-expanded'], 'true');
+  assert.match(pill.attrs['aria-label'], /Hide details$/);
+});
+
+test('a11y: Enter and Space open the panel, Escape closes it, other keys do nothing', () => {
+  const w = loadWidget();
+  w.update('Claude', [real(32)]);
+  const pill = w.pill();
+  const key = (k, extra = {}) => { const e = { prevented: false }; pill.fire('keydown', { key: k, preventDefault() { e.prevented = true; }, ...extra }); return e; };
+  assert.equal(key('Enter').prevented, true);
+  assert.ok(w.panelText(), 'Enter opens');
+  key('Escape');
+  assert.equal(w.panelText(), null, 'Escape closes');
+  key(' ');
+  assert.ok(w.panelText(), 'Space opens');
+  assert.equal(key('a').prevented, false);
+  assert.ok(w.panelText(), 'an unrelated key leaves it as it was');
+});
+
+test('a11y: panel is a labelled region and each bar is a progressbar with a value and reset text', () => {
+  const w = loadWidget();
+  w.update('Claude', [real(32, { resetAt: Date.now() + 2 * hour + 5 * 60e3 }), { id: 'dr', label: 'Deep Research', remaining: 5, source: 'real' }]);
+  w.click();
+  const panel = w.root.byClass('panel')[0];
+  assert.equal(panel.attrs.role, 'region');
+  assert.equal(panel.attrs['aria-label'], 'Claude usage details');
+  const bars = w.root.byClass('bar');
+  assert.equal(bars[0].attrs.role, 'progressbar');
+  assert.equal(bars[0].attrs['aria-label'], 'Session (5h)');
+  assert.equal(bars[0].attrs['aria-valuenow'], '32');
+  assert.match(bars[0].attrs['aria-valuetext'], /^32%, resets in 2h/);
+  assert.equal(bars[1].attrs.role, undefined, 'a counter with no percentage is not a progressbar');
+  assert.equal(bars[1].attrs['aria-hidden'], 'true');
+});
+
+test('a11y: purely decorative bits are hidden from screen readers; the problem box is a status', () => {
+  const w = loadWidget();
+  w.update('Claude', [], {}, null, { kind: 'error', text: 'no usage figures', since: 0 });
+  assert.equal(w.pill().byClass('dot')[0].attrs['aria-hidden'], 'true');
+  assert.match(w.pill().attrs['aria-label'], /Can't read usage here/);
+  w.click();
+  assert.equal(w.root.byClass('problem')[0].attrs.role, 'status');
+});
